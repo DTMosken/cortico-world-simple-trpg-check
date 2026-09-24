@@ -12,10 +12,12 @@
 
 - `laya-multilingual`：在“多语言 Laya Python 环境”下拉选单中选择已安装 `laya` 的 Conda 环境，使用 `convaiinnovations/laya` 的 `multilingual` 检查点。选项来自本机 `~/.conda/environments.txt`，缺失或不可读时只显示当前配置值。首次运行可能由 Laya 下载权重；后续使用本地缓存。
 - `laya`：通过可选依赖 `@receptron/laya` 在本机运行英文检查点。
-- `jev`：按 `worlds.simple-trpg-check.jevSource` 选择 TypeSafe 或 OpenRouter 的 System One API。工具调用会将 `scenario` 和技能名称发送给所选服务。配置页的“Jev 来源”下方显示“打开密钥文件”按钮；点击后打开部署目录的 `.env`，缺少当前来源密钥时补入空的 `*_API_KEY=` 行。填写并保存文件后，下一次模型请求读取密钥。两个来源使用独立密钥。
+- `jev`：按 `worlds.simple-trpg-check.jevSource` 选择 TypeSafe 或 OpenRouter 的 System One API。工具调用会将 `scenario` 和技能名称发送给所选服务。配置页的“Jev 来源”下方显示“打开密钥文件”按钮；点击后打开部署目录的 `.env`，缺少当前来源密钥时补入空的 `CORTICO_JEV_TYPESAFE_API_KEY=` 或 `CORTICO_JEV_OPENROUTER_API_KEY=` 行。填写并保存文件后，下一次模型请求读取密钥。旧的 World 专用变量名仍可读取。
 
 World 左栏的状态灯在首次成功完成模型评估后变绿；配置改变或评估失败后更新状态。
 “判定模型”下方的“测试连接”会发送一项英文技能评分请求，不掷骰；结果显示在按钮旁，并更新左栏状态灯。
+
+同一 Cortico 进程中，若 continuity 与此 World 使用相同的 Laya 类型（multilingual 还需同一 Python 路径），两者共用已加载的模型或 worker。请求依次执行；模型在所有使用者空闲后按其中最长的 TTL 回收。`layaIdleTtlMinutes` 默认 10；设为 `0` 且无其他使用者需要保留模型时，每次评分后释放。不同进程不共用运行实例。
 
 “强制适配多语言”勾选后，World 提示 agent 用英文填写 `scenario` 和 `skill_lists`；它不翻译输入，也不切换判定模型。
 

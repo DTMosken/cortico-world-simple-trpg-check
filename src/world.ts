@@ -7,6 +7,8 @@ import {
   SIMPLE_TRPG_CHECK_CONFIG_GROUP,
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
+  SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET,
+  SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET,
   type SimpleTrpgCheckConfigSection,
 } from './config.ts';
 import { SystemOneSkillScorer, type SkillScorer } from './model.ts';
@@ -20,6 +22,15 @@ export class SimpleTrpgCheckWorld implements World {
   private modelState: 'offline' | 'loading' | 'online' | 'error' = 'offline';
   private modelSignature = '';
   private modelRequestId = 0;
+
+  private hasJevKey(): boolean {
+    const source = this.ctx.cfg.jevSource;
+    return !!(this.ctx.secret(source === 'openrouter'
+      ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET)
+      || this.ctx.secret(source === 'openrouter'
+        ? SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
+      || (source === 'typesafe' && this.ctx.secret('CORTICO_JEV_API_KEY')));
+  }
 
   constructor(
     private readonly ctx: WorldContext<SimpleTrpgCheckConfigSection>,
@@ -67,9 +78,7 @@ export class SimpleTrpgCheckWorld implements World {
 
   console(): WorldConsoleDecl {
     const source = this.ctx.cfg.jevSource;
-    const keySet = !!this.ctx.secret(source === 'openrouter'
-      ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
-      : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET);
+    const keySet = this.hasJevKey();
     const signature = this.currentModelSignature();
     const modelState = signature === this.modelSignature ? this.modelState : 'offline';
     return {
@@ -98,11 +107,7 @@ export class SimpleTrpgCheckWorld implements World {
         }
         if (panel !== 'credentials') throw new Error('未知面板');
         if (method === 'state') {
-          return { backend: this.ctx.cfg.backend, source: this.ctx.cfg.jevSource, keySet: !!this.ctx.secret(
-            this.ctx.cfg.jevSource === 'openrouter'
-              ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
-              : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
-          ) };
+          return { backend: this.ctx.cfg.backend, source: this.ctx.cfg.jevSource, keySet: this.hasJevKey() };
         }
         if (method === 'openKeyFile') {
           const source = args[0];

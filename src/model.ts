@@ -2,17 +2,14 @@ import type { WorldContext } from 'cortico/world.ts';
 import {
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
-  type CheckBackend,
+  SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET,
+  SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET,
   type SimpleTrpgCheckConfigSection,
 } from './config.ts';
-import { startMultilingualLaya, type MultilingualLayaModel } from './multilingual-laya.ts';
+import { startMultilingualLaya } from './multilingual-laya.ts';
+import { layaRuntimeKey, sharedLayaPool, type SharedLayaClient, type SharedLayaModel } from './shared-laya.ts';
 
 type Questions = Record<string, { type: 'noul'; instructions: string }>;
-type LocalModel = {
-  systemOne(state: unknown, questions: Questions): Promise<unknown>;
-  close(): Promise<void>;
-};
-
 export interface SkillScorer {
   score(scenario: string, skills: string[]): Promise<number[]>;
   close(): Promise<void>;
@@ -45,42 +42,44 @@ function probabilitiesFrom(result: unknown, count: number): number[] {
 }
 
 export class SystemOneSkillScorer implements SkillScorer {
-  private localModel: Promise<LocalModel | MultilingualLayaModel> | null = null;
-  private localBackend: CheckBackend | null = null;
+  private layaClient: SharedLayaClient | null = null;
+  private layaKey = '';
 
   constructor(private readonly ctx: WorldContext<SimpleTrpgCheckConfigSection>) {}
 
   async score(scenario: string, skills: string[]): Promise<number[]> {
     const questions = questionsFor(skills);
     const state = { scenario };
-    const result = this.ctx.cfg.backend === 'jev'
-      ? await this.requestJev(state, questions)
-      : await (await this.getLocalModel()).systemOne(state, questions);
+    if (this.ctx.cfg.backend === 'jev') {
+      return probabilitiesFrom(await this.requestJev(state, questions), skills.length);
+    }
+    const result = await this.getLayaClient().systemOne(state, questions);
     return probabilitiesFrom(result, skills.length);
   }
 
   async close(): Promise<void> {
-    const model = this.localModel;
-    this.localModel = null;
-    this.localBackend = null;
-    if (model) {
-      try { await (await model).close(); }
-      catch { /* A failed load has no model to close. */ }
-    }
+    const client = this.layaClient;
+    this.layaClient = null;
+    this.layaKey = '';
+    await client?.dispose();
   }
 
-  private getLocalModel(): Promise<LocalModel | MultilingualLayaModel> {
+  private getLayaClient(): SharedLayaClient {
     const backend = this.ctx.cfg.backend;
-    if (this.localModel && this.localBackend === backend) return this.localModel;
-    this.localBackend = backend;
-    const loading = backend === 'laya-multilingual'
-      ? startMultilingualLaya(this.ctx.cfg.pythonExecutable)
-      : import('@receptron/laya').then(({ Laya }) => Laya.load() as Promise<LocalModel>);
-    this.localModel = loading;
-    void loading.catch(() => {
-      if (this.localModel === loading) { this.localModel = null; this.localBackend = null; }
-    });
-    return this.localModel;
+    const variant = backend === 'laya-multilingual' ? 'multilingual' : 'english';
+    const pythonExecutable = this.ctx.cfg.pythonExecutable;
+    const key = layaRuntimeKey(variant, pythonExecutable);
+    if (this.layaClient && this.layaKey === key) return this.layaClient;
+    void this.layaClient?.dispose();
+    this.layaKey = key;
+    this.layaClient = sharedLayaPool().create(
+      key,
+      () => variant === 'multilingual'
+        ? startMultilingualLaya(pythonExecutable)
+        : import('@receptron/laya').then(({ Laya }) => Laya.load() as Promise<SharedLayaModel>),
+      () => this.ctx.cfg.layaIdleTtlMinutes,
+    );
+    return this.layaClient;
   }
 
   private async requestJev(state: unknown, questions: Questions): Promise<unknown> {
@@ -88,15 +87,17 @@ export class SystemOneSkillScorer implements SkillScorer {
     const secretName = source === 'openrouter'
       ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
       : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
-    const apiKey = this.ctx.secret(secretName);
+    const apiKey = this.ctx.secret(secretName) || this.ctx.secret(source === 'openrouter'
+      ? SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
+      || (source === 'typesafe' ? this.ctx.secret('CORTICO_JEV_API_KEY') : '');
     if (!apiKey) throw new Error(`${source === 'openrouter' ? 'OpenRouter' : 'TypeSafe'} API key 未配置`);
     const endpoint = source === 'openrouter'
-      ? 'https://openrouter.ai/api/v1/systemone'
+      ? 'https://openrouter.ai/api/alpha/decisions'
       : 'https://api.typesafe.ai/v1/systemone';
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'jev-latest', state, questions }),
+      body: JSON.stringify({ model: source === 'openrouter' ? '~typesafe/jev-latest' : 'jev-latest', state, questions }),
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) throw new Error(`Jev 请求失败：HTTP ${response.status}`);

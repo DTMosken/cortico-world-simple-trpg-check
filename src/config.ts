@@ -9,6 +9,7 @@ export interface SimpleTrpgCheckConfigSection {
   jevSource: JevSource;
   forceMultilingual: boolean;
   pythonExecutable: string;
+  layaIdleTtlMinutes: number;
 }
 
 export const SIMPLE_TRPG_CHECK_DEFAULTS: SimpleTrpgCheckConfigSection = {
@@ -17,10 +18,13 @@ export const SIMPLE_TRPG_CHECK_DEFAULTS: SimpleTrpgCheckConfigSection = {
   jevSource: 'typesafe',
   forceMultilingual: false,
   pythonExecutable: 'python',
+  layaIdleTtlMinutes: 10,
 };
 
-export const SIMPLE_TRPG_CHECK_TYPESAFE_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_TYPESAFE_API_KEY';
-export const SIMPLE_TRPG_CHECK_OPENROUTER_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_OPENROUTER_API_KEY';
+export const SIMPLE_TRPG_CHECK_TYPESAFE_SECRET = 'CORTICO_JEV_TYPESAFE_API_KEY';
+export const SIMPLE_TRPG_CHECK_OPENROUTER_SECRET = 'CORTICO_JEV_OPENROUTER_API_KEY';
+export const SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_TYPESAFE_API_KEY';
+export const SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_OPENROUTER_API_KEY';
 
 export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
   id: 'world:simple-trpg-check',
@@ -55,6 +59,15 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
         'x-options': 'simple-trpg-check-conda-python',
         description: '从本机 Conda 环境中选择；该环境需安装 laya。',
         'x-hot': false,
+      },
+      'worlds.simple-trpg-check.layaIdleTtlMinutes': {
+        type: 'integer',
+        title: 'Laya 空闲释放时间',
+        minimum: 0,
+        multipleOf: 1,
+        'x-suffix': 'min',
+        'x-hot': true,
+        description: '最后一次本地评分后保留模型的分钟数；与其他使用者共用时取最长 TTL。',
       },
     },
   },

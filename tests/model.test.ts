@@ -12,7 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('System One skill scoring', () => {
   it.each([
     ['typesafe', 'https://api.typesafe.ai/v1/systemone', SIMPLE_TRPG_CHECK_TYPESAFE_SECRET],
-    ['openrouter', 'https://openrouter.ai/api/v1/systemone', SIMPLE_TRPG_CHECK_OPENROUTER_SECRET],
+    ['openrouter', 'https://openrouter.ai/api/alpha/decisions', SIMPLE_TRPG_CHECK_OPENROUTER_SECRET],
   ] as const)('sends one Jev request to %s and restores input order', async (source, endpoint, secretName) => {
     const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
     try {
@@ -28,7 +28,7 @@ describe('System One skill scoring', () => {
           state: { scenario: string };
           questions: Record<string, { type: string; instructions: string }>;
         };
-        expect(body.model).toBe('jev-latest');
+        expect(body.model).toBe(source === 'openrouter' ? '~typesafe/jev-latest' : 'jev-latest');
         expect(body.state.scenario).toBe('穿过山谷');
         expect(Object.keys(body.questions)).toEqual(['skill_0', 'skill_1']);
         expect(body.questions.skill_0?.instructions).toContain('跑步');
