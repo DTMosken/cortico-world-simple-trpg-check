@@ -44,8 +44,31 @@ async function mountCredentials(ctx: ConsolePanelContext): Promise<void> {
   }
 }
 
+function mountConnectionTest(ctx: ConsolePanelContext): void {
+  const { ui } = ctx;
+  const message = ui.msgline();
+  const button = ui.button('测试连接', {
+    onClick: () => {
+      button.disabled = true;
+      message.textContent = '测试中…';
+      message.classList.remove('bad');
+      void ctx.invoke<{ ok: boolean; error?: string }>('testConnection').then((result) => {
+        message.textContent = result.ok ? '连接成功' : `连接失败：${result.error || '模型没有返回有效结果'}`;
+        message.classList.toggle('bad', !result.ok);
+        void ctx.refresh().catch(() => undefined);
+      }).catch((error) => {
+        message.textContent = `连接失败：${error instanceof Error ? error.message : String(error)}`;
+        message.classList.add('bad');
+      }).finally(() => { button.disabled = false; });
+    },
+  });
+  const actions = ui.actions();
+  actions.append(message, button);
+  ctx.root.replaceChildren(actions);
+}
+
 const client: ConsoleClientBundle = {
-  panels: { credentials: { mount: mountCredentials } },
+  panels: { credentials: { mount: mountCredentials }, 'connection-test': { mount: mountConnectionTest } },
 };
 
 export default client;

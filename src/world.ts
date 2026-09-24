@@ -19,6 +19,7 @@ export class SimpleTrpgCheckWorld implements World {
   private readonly scorer: SkillScorer;
   private modelState: 'offline' | 'loading' | 'online' | 'error' = 'offline';
   private modelSignature = '';
+  private modelRequestId = 0;
 
   constructor(
     private readonly ctx: WorldContext<SimpleTrpgCheckConfigSection>,
@@ -76,14 +77,25 @@ export class SimpleTrpgCheckWorld implements World {
       lamps: [{
         label: '判定模型',
         state: modelState,
-        hint: modelState === 'online' ? '最近一次技能评估成功' : modelState === 'error'
-          ? '最近一次技能评估失败' : modelState === 'loading' ? '正在评估技能' : '尚未成功评估技能',
+        hint: modelState === 'online' ? '最近一次模型请求成功' : modelState === 'error'
+          ? '最近一次模型请求失败' : modelState === 'loading' ? '正在请求模型' : '尚未成功请求模型',
       }],
       badges: this.ctx.cfg.backend === 'jev'
         ? [{ label: source === 'openrouter' ? 'OpenRouter' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
         : [{ label: '判定模型', value: this.ctx.cfg.backend }],
-      panels: [{ id: 'credentials', title: 'Jev 密钥', slot: 'jev-key' }] as unknown as WorldConsoleDecl['panels'],
+      panels: [
+        { id: 'connection-test', title: '测试连接', slot: 'model-test' },
+        { id: 'credentials', title: 'Jev 密钥', slot: 'jev-key' },
+      ] as unknown as WorldConsoleDecl['panels'],
       invoke: async (panel, method, args) => {
+        if (panel === 'connection-test' && method === 'testConnection') {
+          try {
+            await this.assess('A character climbs a waist-high wall to reach the other side.', ['climbing']);
+            return { ok: true };
+          } catch (error) {
+            return { ok: false, error: error instanceof Error ? error.message : String(error) };
+          }
+        }
         if (panel !== 'credentials') throw new Error('未知面板');
         if (method === 'state') {
           return { backend: this.ctx.cfg.backend, source: this.ctx.cfg.jevSource, keySet: !!this.ctx.secret(
@@ -128,6 +140,24 @@ export class SimpleTrpgCheckWorld implements World {
     return `${backend}|${backend === 'jev' ? jevSource : pythonExecutable}`;
   }
 
+  private async assess(scenario: string, skills: string[]): Promise<number[]> {
+    const signature = this.currentModelSignature();
+    const requestId = ++this.modelRequestId;
+    this.modelSignature = signature;
+    this.modelState = 'loading';
+    try {
+      const probabilities = await this.scorer.score(scenario, skills);
+      if (probabilities.length !== skills.length) throw new Error('模型返回的技能答案数量不匹配');
+      probabilities.forEach(difficultyFromProbability);
+      if (signature !== this.currentModelSignature()) throw new Error('判定模型配置已改变，请重试');
+      if (requestId === this.modelRequestId) this.modelState = 'online';
+      return probabilities;
+    } catch (error) {
+      if (requestId === this.modelRequestId && signature === this.currentModelSignature()) this.modelState = 'error';
+      throw error;
+    }
+  }
+
   private async runCheck(args: Record<string, unknown>): Promise<ToolOutcome> {
     try {
       const scenario = args.scenario;
@@ -137,13 +167,8 @@ export class SimpleTrpgCheckWorld implements World {
         (skill) => typeof skill !== 'string' || !skill.trim(),
       )) throw new Error('skill_lists 必须是非空技能名称列表');
       const skills = skillLists as string[];
-      const signature = this.currentModelSignature();
-      this.modelSignature = signature;
-      this.modelState = 'loading';
-      const probabilities = await this.scorer.score(scenario, skills);
-      if (probabilities.length !== skills.length) throw new Error('模型返回的技能答案数量不匹配');
+      const probabilities = await this.assess(scenario, skills);
       const difficulties = probabilities.map(difficultyFromProbability);
-      if (signature === this.currentModelSignature()) this.modelState = 'online';
       const checks = skills.map((skill, index) => {
         const difficulty = difficulties[index]!;
         const roll = this.roll();
@@ -151,7 +176,6 @@ export class SimpleTrpgCheckWorld implements World {
       });
       return { text: formatChecks(checks) };
     } catch (error) {
-      this.modelState = 'error';
       return { text: `技能判定失败：${error instanceof Error ? error.message : String(error)}`, failed: true };
     }
   }

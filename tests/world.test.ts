@@ -58,7 +58,7 @@ describe('Simple TRPG Check World', () => {
     const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20, (file) => { opened.push(file); });
     const panel = world.console?.();
-    expect(panel?.panels?.[0]).toMatchObject({ id: 'credentials', slot: 'jev-key' });
+    expect(panel?.panels?.find((item) => item.id === 'credentials')).toMatchObject({ slot: 'jev-key' });
     expect(await panel?.invoke?.('credentials', 'state', [])).toMatchObject({ source: 'typesafe', keySet: false });
     const first = await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']) as { file: string };
     expect(opened).toEqual([first.file]);
@@ -85,5 +85,33 @@ describe('Simple TRPG Check World', () => {
     expect(world.console().lamps?.[0]?.state).toBe('online');
     ctx.cfg.backend = 'jev';
     expect(world.console().lamps?.[0]?.state).toBe('offline');
+  });
+
+  it('tests the selected model with one score, lights the lamp, and never rolls dice', async () => {
+    const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    ctx.cfg.backend = 'jev';
+    const scorer: SkillScorer = {
+      async score(scenario, skills) {
+        expect(scenario).toContain('climbs');
+        expect(skills).toEqual(['climbing']);
+        return [0.7];
+      },
+      async close() {},
+    };
+    const world = new SimpleTrpgCheckWorld(ctx, scorer, () => { throw new Error('dice were rolled'); });
+    expect(world.console().panels?.[0]).toMatchObject({ id: 'connection-test', slot: 'model-test' });
+    expect(await world.console().invoke?.('connection-test', 'testConnection', [])).toEqual({ ok: true });
+    expect(world.console().lamps?.[0]?.state).toBe('online');
+  });
+
+  it('reports a failed model test and shows an error lamp', async () => {
+    const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    const scorer: SkillScorer = { async score() { throw new Error('connection refused'); }, async close() {} };
+    const world = new SimpleTrpgCheckWorld(ctx, scorer);
+    expect(await world.console().invoke?.('connection-test', 'testConnection', [])).toEqual({
+      ok: false,
+      error: 'connection refused',
+    });
+    expect(world.console().lamps?.[0]?.state).toBe('error');
   });
 });

@@ -34,6 +34,7 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
         title: '判定模型',
         enum: ['laya-multilingual', 'laya', 'jev'],
         'x-hot': false,
+        'x-panel-slot': 'model-test',
       },
       'worlds.simple-trpg-check.jevSource': {
         type: 'string',
