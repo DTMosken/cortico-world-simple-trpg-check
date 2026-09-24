@@ -40,6 +40,7 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
         title: 'Jev 来源',
         enum: ['typesafe', 'openrouter'],
         'x-hot': true,
+        'x-panel-slot': 'jev-key',
       },
       'worlds.simple-trpg-check.forceMultilingual': {
         type: 'boolean',
@@ -56,4 +57,4 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
       },
     },
   },
-};
+} as ConfigGroup;

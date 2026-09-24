@@ -12,7 +12,9 @@
 
 - `laya-multilingual`：在“多语言 Laya Python 环境”下拉选单中选择已安装 `laya` 的 Conda 环境，使用 `convaiinnovations/laya` 的 `multilingual` 检查点。选项来自本机 `~/.conda/environments.txt`，缺失或不可读时只显示当前配置值。首次运行可能由 Laya 下载权重；后续使用本地缓存。
 - `laya`：通过可选依赖 `@receptron/laya` 在本机运行英文检查点。
-- `jev`：按 `worlds.simple-trpg-check.jevSource` 选择 TypeSafe 或 OpenRouter 的 System One API。工具调用会将 `scenario` 和技能名称发送给所选服务。密钥在 World 的“Jev 密钥”面板输入；仅显示当前来源的密码框，按“保存”写入部署的 `.env`。两个来源使用独立密钥。
+- `jev`：按 `worlds.simple-trpg-check.jevSource` 选择 TypeSafe 或 OpenRouter 的 System One API。工具调用会将 `scenario` 和技能名称发送给所选服务。配置页的“Jev 来源”下方显示“打开密钥文件”按钮；点击后打开部署目录的 `.env`，缺少当前来源密钥时补入空的 `*_API_KEY=` 行。填写并保存文件后，下一次模型请求读取密钥。两个来源使用独立密钥。
+
+World 左栏的状态灯在首次成功完成模型评估后变绿；配置改变或评估失败后更新状态。
 
 “强制适配多语言”勾选后，World 提示 agent 用英文填写 `scenario` 和 `skill_lists`；它不翻译输入，也不切换判定模型。
 

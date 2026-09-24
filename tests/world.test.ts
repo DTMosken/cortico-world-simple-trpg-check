@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolCallContext } from 'cortico/core/types.ts';
@@ -51,22 +51,39 @@ describe('Simple TRPG Check World', () => {
     expect((await world.envPromptVars())?.['simpleTrpgCheck.languageRule']).toContain('英文填写');
   });
 
-  it('saves the selected Jev source key in deployment secrets and rejects a stale source', async () => {
+  it('opens a deployment key file with the selected Jev placeholder and rejects a stale source', async () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
-    const saved = new Map<string, string>();
     ctx.cfg.backend = 'jev';
-    ctx.secret = (name) => saved.get(name) ?? '';
-    ctx.storeSecret = (name, value) => { saved.set(name, value); };
-    const world = SIMPLE_TRPG_CHECK.create(ctx);
+    const opened: string[] = [];
+    const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
+    const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20, (file) => { opened.push(file); });
     const panel = world.console?.();
+    expect(panel?.panels?.[0]).toMatchObject({ id: 'credentials', slot: 'jev-key' });
     expect(await panel?.invoke?.('credentials', 'state', [])).toMatchObject({ source: 'typesafe', keySet: false });
-    await panel?.invoke?.('credentials', 'saveKey', ['typesafe', 'first-key']);
-    expect(saved.get(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET)).toBe('first-key');
+    const first = await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']) as { file: string };
+    expect(opened).toEqual([first.file]);
+    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
+    await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']);
+    expect(readFileSync(first.file, 'utf8').match(new RegExp(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`, 'g'))).toHaveLength(1);
+    writeFileSync(first.file, `${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
+    await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']);
+    expect(readFileSync(first.file, 'utf8')).toBe(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
     ctx.cfg.jevSource = 'openrouter';
-    await expect(panel?.invoke?.('credentials', 'saveKey', ['typesafe', 'wrong-key']))
+    await expect(panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']))
       .rejects.toThrow('来源已改变');
-    await panel?.invoke?.('credentials', 'saveKey', ['openrouter', 'second-key']);
-    expect(saved.get(SIMPLE_TRPG_CHECK_OPENROUTER_SECRET)).toBe('second-key');
-    expect(saved.get(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET)).toBe('first-key');
+    await panel?.invoke?.('credentials', 'openKeyFile', ['openrouter']);
+    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_OPENROUTER_SECRET}=`);
+    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
+  });
+
+  it('lights the model lamp after a successful score and clears it on source change', async () => {
+    const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
+    const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20);
+    expect(world.console().lamps?.[0]?.state).toBe('offline');
+    await world.tools()[0]!.handler({ scenario: '爬过墙', skill_lists: ['攀爬'] }, {} as ToolCallContext);
+    expect(world.console().lamps?.[0]?.state).toBe('online');
+    ctx.cfg.backend = 'jev';
+    expect(world.console().lamps?.[0]?.state).toBe('offline');
   });
 });

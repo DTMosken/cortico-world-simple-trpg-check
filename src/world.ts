@@ -10,17 +10,21 @@ import {
   type SimpleTrpgCheckConfigSection,
 } from './config.ts';
 import { SystemOneSkillScorer, type SkillScorer } from './model.ts';
+import { ensureSecretPlaceholder, openSecretFile } from './secret-file.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
 
 export class SimpleTrpgCheckWorld implements World {
   readonly id = 'simple-trpg-check';
   private readonly scorer: SkillScorer;
+  private modelState: 'offline' | 'loading' | 'online' | 'error' = 'offline';
+  private modelSignature = '';
 
   constructor(
     private readonly ctx: WorldContext<SimpleTrpgCheckConfigSection>,
     scorer?: SkillScorer,
     private readonly roll: () => number = () => randomInt(1, 101),
+    private readonly openFile: (path: string) => void | Promise<void> = openSecretFile,
   ) {
     this.scorer = scorer ?? new SystemOneSkillScorer(ctx);
   }
@@ -65,12 +69,20 @@ export class SimpleTrpgCheckWorld implements World {
     const keySet = !!this.ctx.secret(source === 'openrouter'
       ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
       : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET);
+    const signature = this.currentModelSignature();
+    const modelState = signature === this.modelSignature ? this.modelState : 'offline';
     return {
       config: [SIMPLE_TRPG_CHECK_CONFIG_GROUP],
+      lamps: [{
+        label: '判定模型',
+        state: modelState,
+        hint: modelState === 'online' ? '最近一次技能评估成功' : modelState === 'error'
+          ? '最近一次技能评估失败' : modelState === 'loading' ? '正在评估技能' : '尚未成功评估技能',
+      }],
       badges: this.ctx.cfg.backend === 'jev'
         ? [{ label: source === 'openrouter' ? 'OpenRouter' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
         : [{ label: '判定模型', value: this.ctx.cfg.backend }],
-      panels: [{ id: 'credentials', title: 'Jev 密钥' }],
+      panels: [{ id: 'credentials', title: 'Jev 密钥', slot: 'jev-key' }] as unknown as WorldConsoleDecl['panels'],
       invoke: async (panel, method, args) => {
         if (panel !== 'credentials') throw new Error('未知面板');
         if (method === 'state') {
@@ -80,18 +92,17 @@ export class SimpleTrpgCheckWorld implements World {
               : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
           ) };
         }
-        if (method === 'saveKey') {
+        if (method === 'openKeyFile') {
           const source = args[0];
-          const key = args[1];
           if (source !== this.ctx.cfg.jevSource || this.ctx.cfg.backend !== 'jev') {
-            throw new Error('Jev 来源已改变，请重新打开密钥面板');
+            throw new Error('Jev 来源已改变，请重试');
           }
-          if (typeof key !== 'string' || !key.trim()) throw new Error('API key 不能为空');
           const secretName = this.ctx.cfg.jevSource === 'openrouter'
             ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
             : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
-          this.ctx.storeSecret(secretName, key.trim());
-          return { saved: true };
+          const file = ensureSecretPlaceholder(this.ctx.botDir, secretName);
+          await this.openFile(file);
+          return { file };
         }
         throw new Error('未知操作');
       },
@@ -107,7 +118,15 @@ export class SimpleTrpgCheckWorld implements World {
   }
 
   async start(_host: WorldHost): Promise<void> {}
-  async stop(): Promise<void> { await this.scorer.close(); }
+  async stop(): Promise<void> {
+    this.modelState = 'offline';
+    await this.scorer.close();
+  }
+
+  private currentModelSignature(): string {
+    const { backend, jevSource, pythonExecutable } = this.ctx.cfg;
+    return `${backend}|${backend === 'jev' ? jevSource : pythonExecutable}`;
+  }
 
   private async runCheck(args: Record<string, unknown>): Promise<ToolOutcome> {
     try {
@@ -118,9 +137,13 @@ export class SimpleTrpgCheckWorld implements World {
         (skill) => typeof skill !== 'string' || !skill.trim(),
       )) throw new Error('skill_lists 必须是非空技能名称列表');
       const skills = skillLists as string[];
+      const signature = this.currentModelSignature();
+      this.modelSignature = signature;
+      this.modelState = 'loading';
       const probabilities = await this.scorer.score(scenario, skills);
       if (probabilities.length !== skills.length) throw new Error('模型返回的技能答案数量不匹配');
       const difficulties = probabilities.map(difficultyFromProbability);
+      if (signature === this.currentModelSignature()) this.modelState = 'online';
       const checks = skills.map((skill, index) => {
         const difficulty = difficulties[index]!;
         const roll = this.roll();
@@ -128,6 +151,7 @@ export class SimpleTrpgCheckWorld implements World {
       });
       return { text: formatChecks(checks) };
     } catch (error) {
+      this.modelState = 'error';
       return { text: `技能判定失败：${error instanceof Error ? error.message : String(error)}`, failed: true };
     }
   }

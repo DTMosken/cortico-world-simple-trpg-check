@@ -11,7 +11,7 @@ async function mountCredentials(ctx: ConsolePanelContext): Promise<void> {
   render(state);
   ctx.interval(() => {
     void ctx.invoke<KeyState>('state').then((next) => {
-      if (next.backend !== state.backend || next.source !== state.source) {
+      if (next.backend !== state.backend || next.source !== state.source || next.keySet !== state.keySet) {
         state = next;
         render(next);
       }
@@ -20,50 +20,27 @@ async function mountCredentials(ctx: ConsolePanelContext): Promise<void> {
 
   function render(current: KeyState): void {
     const { ui } = ctx;
-    const card = ui.sheet({ title: 'Jev 密钥' });
     if (current.backend !== 'jev') {
-      card.body.appendChild(ui.msgline('当前判定模型未选择 Jev。'));
-      ctx.root.replaceChildren(card.el);
+      ctx.root.replaceChildren();
       return;
     }
     const sourceName = current.source === 'openrouter' ? 'OpenRouter' : 'TypeSafe';
-    const key = ui.input({ type: 'password', placeholder: current.keySet ? '已配置；留空不更改' : 'API key' });
     const message = ui.msgline(current.keySet ? '密钥已配置' : '密钥未配置');
-    const save = ui.button(`保存 ${sourceName} 密钥`, {
-      variant: 'primary',
-      onClick: () => { void saveKey(ctx, current.source, key, message, save); },
+    const open = ui.button(`打开 ${sourceName} 密钥文件`, {
+      onClick: () => {
+        open.disabled = true;
+        void ctx.invoke<{ file: string }>('openKeyFile', [current.source]).then(({ file }) => {
+          message.textContent = `已打开 ${file}`;
+          message.classList.remove('bad');
+        }).catch((error) => {
+          message.textContent = `打开失败：${error instanceof Error ? error.message : String(error)}`;
+          message.classList.add('bad');
+        }).finally(() => { open.disabled = false; });
+      },
     });
     const actions = ui.actions();
-    actions.append(message, save);
-    card.body.append(ui.field(`${sourceName} API key`, key), actions);
-    ctx.root.replaceChildren(card.el);
-  }
-}
-
-async function saveKey(
-  ctx: ConsolePanelContext,
-  source: KeyState['source'],
-  key: HTMLInputElement,
-  message: HTMLDivElement,
-  save: HTMLButtonElement,
-): Promise<void> {
-  if (!key.value.trim()) {
-    message.textContent = 'API key 不能为空';
-    message.classList.add('bad');
-    return;
-  }
-  save.disabled = true;
-  try {
-    await ctx.invoke('saveKey', [source, key.value]);
-    key.value = '';
-    message.textContent = '密钥已保存';
-    message.classList.remove('bad');
-    await ctx.refresh();
-  } catch (error) {
-    message.textContent = `保存失败：${error instanceof Error ? error.message : String(error)}`;
-    message.classList.add('bad');
-  } finally {
-    save.disabled = false;
+    actions.append(message, open);
+    ctx.root.replaceChildren(actions);
   }
 }
 
