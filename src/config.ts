@@ -49,8 +49,9 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
       },
       'worlds.simple-trpg-check.pythonExecutable': {
         type: 'string',
-        title: 'Python 命令',
-        description: '本地 Laya multilingual 使用的 Python；该环境需安装 laya。',
+        title: '多语言 Laya Python 环境',
+        'x-options': 'simple-trpg-check-conda-python',
+        description: '从本机 Conda 环境中选择；该环境需安装 laya。',
         'x-hot': false,
       },
     },

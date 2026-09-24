@@ -10,11 +10,13 @@
 
 `worlds.simple-trpg-check.backend` 可选 `laya-multilingual`（默认）、`laya` 和 `jev`。
 
-- `laya-multilingual`：在 `worlds.simple-trpg-check.pythonExecutable` 指定的 Python 中安装 `laya`，使用 `convaiinnovations/laya` 的 `multilingual` 检查点。首次运行可能由 Laya 下载权重；后续使用本地缓存。
+- `laya-multilingual`：在“多语言 Laya Python 环境”下拉选单中选择已安装 `laya` 的 Conda 环境，使用 `convaiinnovations/laya` 的 `multilingual` 检查点。选项来自本机 `~/.conda/environments.txt`，缺失或不可读时只显示当前配置值。首次运行可能由 Laya 下载权重；后续使用本地缓存。
 - `laya`：通过可选依赖 `@receptron/laya` 在本机运行英文检查点。
 - `jev`：按 `worlds.simple-trpg-check.jevSource` 选择 TypeSafe 或 OpenRouter 的 System One API。工具调用会将 `scenario` 和技能名称发送给所选服务。密钥在 World 的“Jev 密钥”面板输入；仅显示当前来源的密码框，按“保存”写入部署的 `.env`。两个来源使用独立密钥。
 
 “强制适配多语言”勾选后，World 提示 agent 用英文填写 `scenario` 和 `skill_lists`；它不翻译输入，也不切换判定模型。
+
+环境提示词让 agent 只在结果不确定且具有戏剧性的情境中酌情投骰，并在面向用户的文本中写出每项骰值、难度和结果。
 
 ## 开发与安装
 
@@ -26,6 +28,6 @@ corepack pnpm test
 corepack pnpm build:console
 ```
 
-包内的 `pnpm-workspace.yaml` 已允许 `esbuild` 与 `onnxruntime-node` 的安装脚本。multilingual 模式需要在配置中将 `pythonExecutable` 指向已安装 `laya` 的 Python 环境。
+包内的 `pnpm-workspace.yaml` 已允许 `esbuild` 与 `onnxruntime-node` 的安装脚本。multilingual 模式需要在下拉选单中选择已安装 `laya` 的 Python 环境。
 
 在 Cortico 仓库根目录运行 `corepack pnpm check:extension <本包绝对路径>`。然后在目标实例的“扩展”页手动安装此目录，并在 World 配置中启用。安装到运行中的实例需要重启进程；本包的测试和装载检查不会启动 bot。
