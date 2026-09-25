@@ -1,6 +1,7 @@
 import type { WorldContext } from 'cortico/world.ts';
 import {
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
+  SIMPLE_TRPG_CHECK_CUSTOM_SECRET,
   SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
   SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET,
@@ -84,16 +85,19 @@ export class SystemOneSkillScorer implements SkillScorer {
 
   private async requestJev(state: unknown, questions: Questions): Promise<unknown> {
     const source = this.ctx.cfg.jevSource;
-    const secretName = source === 'openrouter'
-      ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
-      : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
-    const apiKey = this.ctx.secret(secretName) || this.ctx.secret(source === 'openrouter'
-      ? SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
-      || (source === 'typesafe' ? this.ctx.secret('CORTICO_JEV_API_KEY') : '');
-    if (!apiKey) throw new Error(`${source === 'openrouter' ? 'OpenRouter' : 'TypeSafe'} API key 未配置`);
-    const endpoint = source === 'openrouter'
-      ? 'https://openrouter.ai/api/alpha/decisions'
-      : 'https://api.typesafe.ai/v1/systemone';
+    const apiKey = source === 'custom' ? this.ctx.secret(SIMPLE_TRPG_CHECK_CUSTOM_SECRET)
+      : source === 'openrouter'
+        ? this.ctx.secret(SIMPLE_TRPG_CHECK_OPENROUTER_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET)
+        : this.ctx.secret(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
+          || this.ctx.secret(SIMPLE_TRPG_CHECK_CUSTOM_SECRET);
+    if (!apiKey) throw new Error(`${source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义 Jev' : 'TypeSafe'} API key 未配置`);
+    const endpoint = source === 'openrouter' ? 'https://openrouter.ai/api/alpha/decisions'
+      : source === 'custom' ? this.ctx.cfg.jevEndpoint.trim() : 'https://api.typesafe.ai/v1/systemone';
+    if (source === 'custom') {
+      let url: URL;
+      try { url = new URL(endpoint); } catch { throw new Error('自定义 Jev 服务地址无效'); }
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('自定义 Jev 服务地址无效');
+    }
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },

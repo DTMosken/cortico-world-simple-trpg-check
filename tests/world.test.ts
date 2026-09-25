@@ -7,7 +7,7 @@ import { dryMountWorld, fakeWorldContext } from 'cortico/extensions/dry-mount.ts
 import { SIMPLE_TRPG_CHECK } from '../src/definition.ts';
 import { SimpleTrpgCheckWorld } from '../src/world.ts';
 import type { SkillScorer } from '../src/model.ts';
-import { SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
+import { SIMPLE_TRPG_CHECK_CUSTOM_SECRET, SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
 
 let scratchDir: string;
 beforeEach(() => { scratchDir = mkdtempSync(join(tmpdir(), 'simple-trpg-check-')); });
@@ -76,6 +76,10 @@ describe('Simple TRPG Check World', () => {
     const first = await panel?.invoke?.('config', 'openKeyFile', ['typesafe']) as { file: string };
     expect(opened).toEqual([first.file]);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
+    ctx.cfg.jevSource = 'custom';
+    await panel?.invoke?.('config', 'openKeyFile', ['custom']);
+    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_CUSTOM_SECRET}=`);
+    ctx.cfg.jevSource = 'typesafe';
     await panel?.invoke?.('config', 'openKeyFile', ['typesafe']);
     expect(readFileSync(first.file, 'utf8').match(new RegExp(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`, 'g'))).toHaveLength(1);
     writeFileSync(first.file, `${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);

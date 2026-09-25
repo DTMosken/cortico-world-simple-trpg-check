@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fakeWorldContext } from 'cortico/extensions/dry-mount.ts';
 import { SIMPLE_TRPG_CHECK } from '../src/definition.ts';
 import { SystemOneSkillScorer } from '../src/model.ts';
-import { SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
+import { SIMPLE_TRPG_CHECK_CUSTOM_SECRET, SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -13,12 +13,14 @@ describe('System One skill scoring', () => {
   it.each([
     ['typesafe', 'https://api.typesafe.ai/v1/systemone', SIMPLE_TRPG_CHECK_TYPESAFE_SECRET],
     ['openrouter', 'https://openrouter.ai/api/alpha/decisions', SIMPLE_TRPG_CHECK_OPENROUTER_SECRET],
+    ['custom', 'http://localhost:8080/decisions', SIMPLE_TRPG_CHECK_CUSTOM_SECRET],
   ] as const)('sends one Jev request to %s and restores input order', async (source, endpoint, secretName) => {
     const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
     try {
       const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
       ctx.cfg.backend = 'jev';
       ctx.cfg.jevSource = source;
+      ctx.cfg.jevEndpoint = endpoint;
       ctx.secret = (name) => name === secretName ? 'test-key' : '';
       vi.stubGlobal('fetch', async (url: string, opts: RequestInit) => {
         expect(url).toBe(endpoint);
@@ -39,6 +41,22 @@ describe('System One skill scoring', () => {
         } }), { status: 200 });
       });
       expect(await new SystemOneSkillScorer(ctx).score('穿过山谷', ['跑步', '攀爬'])).toEqual([0.2, 0.8]);
+    } finally {
+      rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an invalid custom Jev endpoint before fetching', async () => {
+    const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
+    try {
+      const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+      ctx.cfg.backend = 'jev';
+      ctx.cfg.jevSource = 'custom';
+      ctx.cfg.jevEndpoint = 'file:///tmp/decisions';
+      ctx.secret = (name) => name === SIMPLE_TRPG_CHECK_CUSTOM_SECRET ? 'test-key' : '';
+      vi.stubGlobal('fetch', () => { throw new Error('unexpected fetch'); });
+      await expect(new SystemOneSkillScorer(ctx).score('情境', ['攀爬']))
+        .rejects.toThrow('自定义 Jev 服务地址无效');
     } finally {
       rmSync(scratchDir, { recursive: true, force: true });
     }

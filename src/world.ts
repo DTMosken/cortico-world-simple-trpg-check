@@ -6,6 +6,7 @@ import { classify, difficultyFromProbability, formatChecks } from './check.ts';
 import {
   SIMPLE_TRPG_CHECK_CONFIG_GROUP,
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
+  SIMPLE_TRPG_CHECK_CUSTOM_SECRET,
   SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
   SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET,
@@ -26,11 +27,11 @@ export class SimpleTrpgCheckWorld implements World {
 
   private hasJevKey(): boolean {
     const source = this.ctx.cfg.jevSource;
-    return !!(this.ctx.secret(source === 'openrouter'
-      ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET)
-      || this.ctx.secret(source === 'openrouter'
-        ? SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET : SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
-      || (source === 'typesafe' && this.ctx.secret('CORTICO_JEV_API_KEY')));
+    return !!(source === 'custom' ? this.ctx.secret(SIMPLE_TRPG_CHECK_CUSTOM_SECRET)
+      : source === 'openrouter'
+        ? this.ctx.secret(SIMPLE_TRPG_CHECK_OPENROUTER_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET)
+        : this.ctx.secret(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
+          || this.ctx.secret(SIMPLE_TRPG_CHECK_CUSTOM_SECRET));
   }
 
   constructor(
@@ -90,7 +91,7 @@ export class SimpleTrpgCheckWorld implements World {
           ? '最近一次模型请求失败' : modelState === 'loading' ? '正在请求模型' : '尚未成功请求模型',
       }],
       badges: this.ctx.cfg.backend === 'jev'
-        ? [{ label: source === 'openrouter' ? 'OpenRouter' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
+        ? [{ label: source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义 Jev' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
         : [{ label: '判定模型', value: this.ctx.cfg.backend }],
       panels: [{ id: 'config', title: '配置' }],
       invoke: async (panel, method, args) => {
@@ -124,9 +125,8 @@ export class SimpleTrpgCheckWorld implements World {
           if (source !== this.ctx.cfg.jevSource || this.ctx.cfg.backend !== 'jev') {
             throw new Error('Jev 来源已改变，请重试');
           }
-          const secretName = this.ctx.cfg.jevSource === 'openrouter'
-            ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
-            : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
+          const secretName = this.ctx.cfg.jevSource === 'openrouter' ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
+            : this.ctx.cfg.jevSource === 'custom' ? SIMPLE_TRPG_CHECK_CUSTOM_SECRET : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
           const file = ensureSecretPlaceholder(this.ctx.botDir, secretName);
           await this.openFile(file);
           return { file };
@@ -151,8 +151,8 @@ export class SimpleTrpgCheckWorld implements World {
   }
 
   private currentModelSignature(): string {
-    const { backend, jevSource, pythonExecutable } = this.ctx.cfg;
-    return `${backend}|${backend === 'jev' ? jevSource : pythonExecutable}`;
+    const { backend, jevSource, jevEndpoint, pythonExecutable } = this.ctx.cfg;
+    return `${backend}|${backend === 'jev' ? `${jevSource}|${jevSource === 'custom' ? jevEndpoint : ''}` : pythonExecutable}`;
   }
 
   private async assess(scenario: string, skills: string[]): Promise<number[]> {

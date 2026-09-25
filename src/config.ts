@@ -1,12 +1,13 @@
 import type { ConfigGroup } from 'cortico/core/types.ts';
 
 export type CheckBackend = 'laya' | 'laya-multilingual' | 'jev';
-export type JevSource = 'typesafe' | 'openrouter';
+export type JevSource = 'typesafe' | 'openrouter' | 'custom';
 
 export interface SimpleTrpgCheckConfigSection {
   enabled: boolean;
   backend: CheckBackend;
   jevSource: JevSource;
+  jevEndpoint: string;
   forceMultilingual: boolean;
   pythonExecutable: string;
   layaIdleTtlMinutes: number;
@@ -16,6 +17,7 @@ export const SIMPLE_TRPG_CHECK_DEFAULTS: SimpleTrpgCheckConfigSection = {
   enabled: false,
   backend: 'laya-multilingual',
   jevSource: 'typesafe',
+  jevEndpoint: '',
   forceMultilingual: false,
   pythonExecutable: 'python',
   layaIdleTtlMinutes: 10,
@@ -23,6 +25,7 @@ export const SIMPLE_TRPG_CHECK_DEFAULTS: SimpleTrpgCheckConfigSection = {
 
 export const SIMPLE_TRPG_CHECK_TYPESAFE_SECRET = 'CORTICO_JEV_TYPESAFE_API_KEY';
 export const SIMPLE_TRPG_CHECK_OPENROUTER_SECRET = 'CORTICO_JEV_OPENROUTER_API_KEY';
+export const SIMPLE_TRPG_CHECK_CUSTOM_SECRET = 'CORTICO_JEV_API_KEY';
 export const SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_TYPESAFE_API_KEY';
 export const SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET = 'CORTICO_SIMPLE_TRPG_CHECK_OPENROUTER_API_KEY';
 
@@ -42,7 +45,12 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
       'worlds.simple-trpg-check.jevSource': {
         type: 'string',
         title: 'Jev 来源',
-        enum: ['typesafe', 'openrouter'],
+        enum: ['typesafe', 'openrouter', 'custom'],
+        'x-hot': true,
+      },
+      'worlds.simple-trpg-check.jevEndpoint': {
+        type: 'string',
+        title: '自定义 Jev 服务地址',
         'x-hot': true,
       },
       'worlds.simple-trpg-check.forceMultilingual': {
