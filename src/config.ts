@@ -38,14 +38,12 @@ export const SIMPLE_TRPG_CHECK_CONFIG_GROUP: ConfigGroup = {
         title: '判定模型',
         enum: ['laya-multilingual', 'laya', 'jev'],
         'x-hot': false,
-        'x-panel-slot': 'model-test',
       },
       'worlds.simple-trpg-check.jevSource': {
         type: 'string',
         title: 'Jev 来源',
         enum: ['typesafe', 'openrouter'],
         'x-hot': true,
-        'x-panel-slot': 'jev-key',
       },
       'worlds.simple-trpg-check.forceMultilingual': {
         type: 'boolean',

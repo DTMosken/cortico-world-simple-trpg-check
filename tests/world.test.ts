@@ -51,6 +51,19 @@ describe('Simple TRPG Check World', () => {
     expect((await world.envPromptVars())?.['simpleTrpgCheck.languageRule']).toContain('英文填写');
   });
 
+  it('saves declared fields through the config panel and rejects invalid values', async () => {
+    const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    const world = new SimpleTrpgCheckWorld(ctx);
+    expect(world.console().config).toBeUndefined();
+    expect(await world.console().invoke?.('config', 'save', ['backend', 'jev']))
+      .toMatchObject({ config: { backend: 'jev' } });
+    expect(ctx.cfg.backend).toBe('jev');
+    await expect(world.console().invoke?.('config', 'save', ['backend', 'invalid']))
+      .rejects.toThrow('配置值无效');
+    await expect(world.console().invoke?.('config', 'save', ['enabled', false]))
+      .rejects.toThrow('未知配置项');
+  });
+
   it('opens a deployment key file with the selected Jev placeholder and rejects a stale source', async () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
     ctx.cfg.backend = 'jev';
@@ -58,20 +71,20 @@ describe('Simple TRPG Check World', () => {
     const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20, (file) => { opened.push(file); });
     const panel = world.console?.();
-    expect(panel?.panels?.find((item) => item.id === 'credentials')).toMatchObject({ slot: 'jev-key' });
-    expect(await panel?.invoke?.('credentials', 'state', [])).toMatchObject({ source: 'typesafe', keySet: false });
-    const first = await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']) as { file: string };
+    expect(panel?.panels).toEqual([{ id: 'config', title: '配置' }]);
+    expect(await panel?.invoke?.('config', 'state', [])).toMatchObject({ config: { jevSource: 'typesafe' }, keySet: false });
+    const first = await panel?.invoke?.('config', 'openKeyFile', ['typesafe']) as { file: string };
     expect(opened).toEqual([first.file]);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
-    await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']);
+    await panel?.invoke?.('config', 'openKeyFile', ['typesafe']);
     expect(readFileSync(first.file, 'utf8').match(new RegExp(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`, 'g'))).toHaveLength(1);
     writeFileSync(first.file, `${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
-    await panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']);
+    await panel?.invoke?.('config', 'openKeyFile', ['typesafe']);
     expect(readFileSync(first.file, 'utf8')).toBe(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
     ctx.cfg.jevSource = 'openrouter';
-    await expect(panel?.invoke?.('credentials', 'openKeyFile', ['typesafe']))
+    await expect(panel?.invoke?.('config', 'openKeyFile', ['typesafe']))
       .rejects.toThrow('来源已改变');
-    await panel?.invoke?.('credentials', 'openKeyFile', ['openrouter']);
+    await panel?.invoke?.('config', 'openKeyFile', ['openrouter']);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_OPENROUTER_SECRET}=`);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
   });
@@ -99,8 +112,8 @@ describe('Simple TRPG Check World', () => {
       async close() {},
     };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => { throw new Error('dice were rolled'); });
-    expect(world.console().panels?.[0]).toMatchObject({ id: 'connection-test', slot: 'model-test' });
-    expect(await world.console().invoke?.('connection-test', 'testConnection', [])).toEqual({ ok: true });
+    expect(world.console().panels).toEqual([{ id: 'config', title: '配置' }]);
+    expect(await world.console().invoke?.('config', 'testConnection', [])).toEqual({ ok: true });
     expect(world.console().lamps?.[0]?.state).toBe('online');
   });
 
@@ -108,7 +121,7 @@ describe('Simple TRPG Check World', () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
     const scorer: SkillScorer = { async score() { throw new Error('connection refused'); }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer);
-    expect(await world.console().invoke?.('connection-test', 'testConnection', [])).toEqual({
+    expect(await world.console().invoke?.('config', 'testConnection', [])).toEqual({
       ok: false,
       error: 'connection refused',
     });

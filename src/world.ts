@@ -12,6 +12,7 @@ import {
   type SimpleTrpgCheckConfigSection,
 } from './config.ts';
 import { SystemOneSkillScorer, type SkillScorer } from './model.ts';
+import { discoverCondaPythonOptions } from './conda-environments.ts';
 import { ensureSecretPlaceholder, openSecretFile } from './secret-file.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
@@ -82,7 +83,6 @@ export class SimpleTrpgCheckWorld implements World {
     const signature = this.currentModelSignature();
     const modelState = signature === this.modelSignature ? this.modelState : 'offline';
     return {
-      config: [SIMPLE_TRPG_CHECK_CONFIG_GROUP],
       lamps: [{
         label: '判定模型',
         state: modelState,
@@ -92,22 +92,32 @@ export class SimpleTrpgCheckWorld implements World {
       badges: this.ctx.cfg.backend === 'jev'
         ? [{ label: source === 'openrouter' ? 'OpenRouter' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
         : [{ label: '判定模型', value: this.ctx.cfg.backend }],
-      panels: [
-        { id: 'connection-test', title: '测试连接', slot: 'model-test' },
-        { id: 'credentials', title: 'Jev 密钥', slot: 'jev-key' },
-      ] as unknown as WorldConsoleDecl['panels'],
+      panels: [{ id: 'config', title: '配置' }],
       invoke: async (panel, method, args) => {
-        if (panel === 'connection-test' && method === 'testConnection') {
+        if (panel !== 'config') throw new Error('未知面板');
+        if (method === 'state') {
+          return { config: { ...this.ctx.cfg }, keySet: this.hasJevKey() };
+        }
+        if (method === 'options') return discoverCondaPythonOptions();
+        if (method === 'save') {
+          const [key, value] = args;
+          const property = SIMPLE_TRPG_CHECK_CONFIG_GROUP.schema.properties?.[`worlds.simple-trpg-check.${key}`];
+          if (!property || typeof key !== 'string' || key === 'enabled') throw new Error('未知配置项');
+          if (property.type === 'boolean' ? typeof value !== 'boolean'
+            : property.type === 'integer' ? typeof value !== 'number' || !Number.isInteger(value) || value < (property.minimum ?? 0)
+              : typeof value !== 'string' || (property.enum && !property.enum.includes(value))) {
+            throw new Error('配置值无效');
+          }
+          this.ctx.persist({ [key]: value });
+          return { config: { ...this.ctx.cfg }, keySet: this.hasJevKey() };
+        }
+        if (method === 'testConnection') {
           try {
             await this.assess('A character climbs a waist-high wall to reach the other side.', ['climbing']);
             return { ok: true };
           } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : String(error) };
           }
-        }
-        if (panel !== 'credentials') throw new Error('未知面板');
-        if (method === 'state') {
-          return { backend: this.ctx.cfg.backend, source: this.ctx.cfg.jevSource, keySet: this.hasJevKey() };
         }
         if (method === 'openKeyFile') {
           const source = args[0];
