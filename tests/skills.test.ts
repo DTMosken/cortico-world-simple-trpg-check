@@ -1,0 +1,69 @@
+import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { ToolCallContext } from 'cortico/core/types.ts';
+import { fakeWorldContext } from 'cortico/extensions/dry-mount.ts';
+import { SIMPLE_TRPG_CHECK } from '../src/definition.ts';
+import type { SkillScorer } from '../src/model.ts';
+import { LEVEL_OPTIONS, budgetViolation, questionsFor, type CheckRequest } from '../src/request.ts';
+import { SimpleTrpgCheckWorld } from '../src/world.ts';
+import { ALL_SKILL_NAMES, COC_SKILLS } from './helpers/coc-skills.ts';
+
+const CHARACTER = { traits: '无特别之处。', condition: '无异常。' };
+const SITUATION = { weather: '普通降雨', gear: '一双软底鞋', info: '布局已知', time: '无时限', senses: '灯光充足' };
+
+function requestFor(skills: string[]): CheckRequest {
+  return {
+    character: { ...CHARACTER },
+    situation: { ...SITUATION },
+    checks: skills.map((skill) => ({ skill, goal: '在时限内达成眼前的目标。', evidence: '靠它吃饭多年，处理过大量同类情形。' })),
+  };
+}
+
+describe('常用技能表', () => {
+  it('keeps the expected coverage', () => {
+    expect(COC_SKILLS).toHaveLength(29);
+    expect(COC_SKILLS.map((entry) => entry.name)).toContain('信用');
+    expect(COC_SKILLS.find((entry) => entry.name === '巧手')?.aliases).toEqual(['Sleight of Hand', '偷窃', '伪造', '锁匠']);
+  });
+
+  it('keeps every skill name and alias inside the budget and the ten-option question', () => {
+    for (const skill of ALL_SKILL_NAMES) {
+      const request = requestFor([skill]);
+      expect(budgetViolation(request, true)).toBeNull();
+      const question = questionsFor(request, true).check_0!;
+      expect(question.instructions).toContain(skill);
+      expect(Object.keys(question.criteria)).toEqual([...LEVEL_OPTIONS]);
+    }
+  });
+
+  it('lists the same skills in the environment prompt', () => {
+    const prompt = readFileSync(fileURLToPath(new URL('../src/ENV_PROMPT.md', import.meta.url)), 'utf8');
+    for (const entry of COC_SKILLS) expect(prompt).toContain(entry.name);
+  });
+
+  it('scores a mixed list of common skills in input order', async () => {
+    const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-skills-'));
+    try {
+      const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+      const seen: string[] = [];
+      const scorer: SkillScorer = {
+        async score(request) {
+          seen.push(...request.checks.map((check) => check.skill));
+          return request.checks.map((_, index) => 20 + index);
+        },
+        async close() {},
+      };
+      const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 10);
+      const names = ['智力', '灵感', '射击（步枪）', '信用'];
+      const result = await world.tools()[0]!.handler({ ...requestFor(names) }, {} as ToolCallContext) as { text: string };
+      expect(seen).toEqual(names);
+      for (const name of names) expect(result.text).toContain(`${name}：`);
+      expect(result.text).not.toContain('技能判定失败');
+    } finally {
+      rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
+});

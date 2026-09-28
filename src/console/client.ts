@@ -104,6 +104,9 @@ async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
         keyRow.append(field, keyStatus, open);
         fields.appendChild(keyRow);
       } else fields.appendChild(field);
+      if (key === 'backend' && config.backend !== 'jev') {
+        fields.appendChild(ui.msgline('本地 Laya 检查点在本域实测读不出角色水平（难度几乎恒定在 60 上下），建议改用 Jev。', true));
+      }
       if (property.description) fields.appendChild(ui.msgline(property.description));
     }
     sheet.body.appendChild(fields);
