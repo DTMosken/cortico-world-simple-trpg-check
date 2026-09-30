@@ -1,9 +1,10 @@
 {
   "name": "cortico-world-simple-trpg-check",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
-  "description": "TRPG skill checks with Laya or Jev probability scores and d100 rolls",
+  "description": "Cortico 的 TRPG 技能检定 World 扩展，使用 Laya 或 Jev 评估技能水平，支持 d100 掷骰、组合与对抗检定。",
   "license": "MIT",
+  "author": "DTMosken",
   "keywords": [
     "cortico-world",
     "cortico"
