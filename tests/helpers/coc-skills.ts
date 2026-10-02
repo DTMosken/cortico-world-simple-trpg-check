@@ -36,7 +36,7 @@ export const COC_SKILLS: SkillEntry[] = [
   { name: '科学', aliases: ['Science'] },
   { name: '神秘学', aliases: ['Occult'] },
   { name: '历史', aliases: ['History'] },
-  { name: '信用', aliases: ['Credit'] },
+  { name: '财富', aliases: ['Wealth', '信用', '信用评级', 'Credit', 'Credit Rating'] },
 ];
 
 /** 主名与别名的平铺列表，按出现顺序。 */

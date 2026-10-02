@@ -44,11 +44,7 @@ export function checksLabel(checks: CheckSpec[], joint?: Joint): string {
 }
 
 /**
- * 水平档位表：十档的标签与代表值。六个语义锚点（外行 / 初学者 / 业余者 / 职业=学士 /
- * 专家=硕士博士 / 世界顶尖）之间各插一档，使模型能表达两个锚点之间的位置；档位越密，
- * 读出越不会粘在锚点上。整张表对所有判定通用，不区分技能与信用；
- * 信用那套切点不同（0/1/10/50/90/99），这里用的是技能尺的代表值，属已知近似，
- * 等后续用别的手段代偿情境修正时一并重估。
+ * 档位描述与代表值。普通技能按训练与专业水平分十档，财富按生活水准与资产分六档。
  */
 export interface LevelBand {
   label: string;
@@ -82,10 +78,35 @@ const LEVEL_BANDS: Record<'zh' | 'en', LevelBand[]> = {
   ],
 };
 
+const WEALTH_BANDS: Record<'zh' | 'en', LevelBand[]> = {
+  zh: [
+    { label: '身无分文，流落街头', representative: 0 },
+    { label: '极端贫困，勉强果腹', representative: 5 },
+    { label: '中等水平，在合理的前提下生活得比较舒适', representative: 30 },
+    { label: '富裕，某些条件下近乎奢侈', representative: 70 },
+    { label: '富有，生活无忧并极为奢侈', representative: 94 },
+    { label: '超级有钱，钱对你来说只是数字', representative: 99 },
+  ],
+  en: [
+    { label: 'Penniless and living on the streets', representative: 0 },
+    { label: 'Extremely poor, barely able to eat', representative: 5 },
+    { label: 'Average means, living reasonably comfortably', representative: 30 },
+    { label: 'Wealthy, with some luxuries', representative: 70 },
+    { label: 'Rich, living carefree and very luxuriously', representative: 94 },
+    { label: 'Extremely wealthy; money is just a number', representative: 99 },
+  ],
+};
+
 export const LEVEL_OPTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const;
 
-export function levelBands(chinese: boolean): LevelBand[] {
-  return LEVEL_BANDS[chinese ? 'zh' : 'en'];
+const WEALTH_SKILLS = new Set(['财富', '信用', '信用评级', 'wealth', 'credit', 'credit rating']);
+
+export function isWealthSkill(skill: string): boolean {
+  return WEALTH_SKILLS.has(skill.trim().toLowerCase());
+}
+
+export function levelBands(chinese: boolean, skill = ''): LevelBand[] {
+  return (isWealthSkill(skill) ? WEALTH_BANDS : LEVEL_BANDS)[chinese ? 'zh' : 'en'];
 }
 
 export interface LevelQuestion {
@@ -164,10 +185,12 @@ export function serializeState(request: CheckRequest): string {
 
 /** 每项技能一个问题：角色在这一点上处于哪一档。选项键用中性字母，档位描述进 criteria。 */
 export function questionsFor(request: CheckRequest, chinese: boolean): Record<string, LevelQuestion> {
-  const bands = levelBands(chinese);
-  return Object.fromEntries(request.checks.map((check, index) => [`check_${index}`, {
-    type: 'choice' as const,
-    instructions: `In the skill "${check.skill}", which level is the character at? Character: ${check.evidence}`,
-    criteria: Object.fromEntries(bands.map((band, position) => [LEVEL_OPTIONS[position]!, band.label])),
-  }]));
+  return Object.fromEntries(request.checks.map((check, index) => {
+    const bands = levelBands(chinese, check.skill);
+    return [`check_${index}`, {
+      type: 'choice' as const,
+      instructions: `In the skill "${check.skill}", which level is the character at? Character: ${check.evidence}`,
+      criteria: Object.fromEntries(bands.map((band, position) => [LEVEL_OPTIONS[position]!, band.label])),
+    }];
+  }));
 }

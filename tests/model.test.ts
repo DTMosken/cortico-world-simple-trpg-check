@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fakeWorldContext } from 'cortico/extensions/dry-mount.ts';
 import { SIMPLE_TRPG_CHECK } from '../src/definition.ts';
-import { SystemOneSkillScorer } from '../src/model.ts';
+import { levelsFromAnswers, SystemOneSkillScorer } from '../src/model.ts';
+import { difficultyFromLevel } from '../src/check.ts';
 import { applyReadout, readoutFor } from '../src/readout.ts';
 import { LEVEL_OPTIONS, type CheckRequest } from '../src/request.ts';
 import { SIMPLE_TRPG_CHECK_CUSTOM_SECRET, SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
@@ -21,6 +22,55 @@ const REQUEST: CheckRequest = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('System One skill scoring', () => {
+  it('replays the captured wealth distributions on every backend', () => {
+    const probabilities = [
+      { A: 0.99, C: 0.01 },
+      { B: 0.99, C: 0.01 },
+      { C: 1 },
+      { D: 1 },
+      { E: 0.99, F: 0.01 },
+    ];
+    const result = { answers: Object.fromEntries(probabilities.map((p, index) => [
+      `check_${index}`, { type: 'choice', probabilities: p },
+    ])) };
+    for (const backend of ['jev', 'laya', 'laya-multilingual'] as const) {
+      const levels = levelsFromAnswers(result, probabilities.map(() => '财富'), backend);
+      expect(levels.map(difficultyFromLevel)).toEqual([1, 5, 30, 70, 94]);
+    }
+  });
+
+  it('rejects a wealth answer whose probability mass is outside the wealth options', () => {
+    const result = { answers: { check_0: { type: 'choice', probabilities: { G: 1 } } } };
+    expect(() => levelsFromAnswers(result, ['财富'], 'jev')).toThrow('模型答案无效');
+  });
+
+  it.each(['财富', '信用', '信用评级', 'Wealth', 'Credit', 'Credit Rating'])(
+    'reads %s and ordinary skills on their own scales in input order', async (skill) => {
+      const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
+      try {
+        const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+        ctx.cfg.backend = 'jev';
+        ctx.secret = () => 'test-key';
+        vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ answers: {
+          check_2: { type: 'choice', probabilities: { E: 1 } },
+          check_0: { type: 'choice', probabilities: { F: 1 } },
+          check_1: { type: 'choice', probabilities: { D: 1 } },
+        } }), { status: 200 }));
+        const request: CheckRequest = { ...REQUEST, checks: [
+          REQUEST.checks[0]!,
+          { skill, goal: '支付一笔大额开支。', evidence: '富裕，随时拿得出大笔现金。' },
+          { skill, goal: '支付一笔大额开支。', evidence: '生活无忧且极为奢侈，资产相当可观。' },
+        ] };
+        const professional = LEVEL_OPTIONS.map((_, index) => index === 5 ? 1 : 0);
+        expect(await new SystemOneSkillScorer(ctx).score(request)).toEqual([
+          applyReadout(professional, readoutFor('jev')), 70, 94,
+        ]);
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    },
+  );
+
   it.each([
     ['typesafe', 'https://api.typesafe.ai/v1/systemone', SIMPLE_TRPG_CHECK_TYPESAFE_SECRET],
     ['openrouter', 'https://openrouter.ai/api/alpha/decisions', SIMPLE_TRPG_CHECK_OPENROUTER_SECRET],

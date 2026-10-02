@@ -10,7 +10,7 @@ import {
 } from './config.ts';
 import { startMultilingualLaya } from './multilingual-laya.ts';
 import { applyReadout, readoutFor } from './readout.ts';
-import { LEVEL_OPTIONS, questionsFor, serializeState, type CheckRequest, type LevelQuestion } from './request.ts';
+import { LEVEL_OPTIONS, isWealthSkill, levelBands, questionsFor, serializeState, type CheckRequest, type LevelQuestion } from './request.ts';
 import { layaRuntimeKey, sharedLayaPool, type SharedLayaClient, type SharedLayaModel } from './shared-laya.ts';
 
 type Questions = Record<string, LevelQuestion>;
@@ -35,17 +35,16 @@ export async function loadEnglishLaya(): Promise<SharedLayaModel> {
 }
 
 /**
- * 水平读出：模型对每项技能给出档位分布（十档），读出把分布映射成 0–100 的水平。
- * Jev 走离线训练产物（src/level-readout.ts；训练与选择见 evals/train.ts），运行时只做插值，不训练。
- * 本地 Laya 检查点实测读不出水平证据（极端证据只挪动 15 点），保持恒等读出。
+ * 水平读出：普通技能的十档分布经读出映射为 0–100；财富的六档分布直接按代表值取期望。
+ * 普通技能的 Jev 读出使用 src/level-readout.ts，本地 Laya 保持恒等读出；运行时不训练。
  */
 
 /** 读一项技能的档位概率分布并归一化；缺项按 0 计。无效时抛错。 */
-export function probabilityVector(item: unknown, label: string): number[] {
+export function probabilityVector(item: unknown, label: string, options: readonly string[] = LEVEL_OPTIONS): number[] {
   const probabilities = item && typeof item === 'object' ? (item as { probabilities?: unknown }).probabilities : undefined;
   if (!probabilities || typeof probabilities !== 'object') throw new Error(`${label}的模型答案无效`);
   const distribution = probabilities as Record<string, unknown>;
-  const shares = LEVEL_OPTIONS.map((option) => {
+  const shares = options.map((option) => {
     const share = distribution[option];
     if (share === undefined) return 0;
     if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
@@ -58,18 +57,21 @@ export function probabilityVector(item: unknown, label: string): number[] {
   return shares.map((share) => share / mass);
 }
 
-/** 读模型答案里的档位分布，过一遍对应后端的水平读出。 */
-export function levelsFromAnswers(result: unknown, count: number, backend: CheckBackend): number[] {
+/** 按技能对应的标尺读出水平，返回顺序与技能列表一致。 */
+export function levelsFromAnswers(result: unknown, skills: readonly string[], backend: CheckBackend): number[] {
   if (!result || typeof result !== 'object') throw new Error('模型没有返回判定结果');
   const answers = (result as { answers?: unknown }).answers;
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('模型没有返回技能答案');
   const keyed = answers as Record<string, unknown>;
-  if (Object.keys(keyed).length !== count) throw new Error('模型返回的技能答案数量不匹配');
+  if (Object.keys(keyed).length !== skills.length) throw new Error('模型返回的技能答案数量不匹配');
   const readout = readoutFor(backend);
-  return Array.from({ length: count }, (_, index) => applyReadout(
-    probabilityVector(keyed[`check_${index}`], `第 ${index + 1} 项技能`),
-    readout,
-  ));
+  return skills.map((skill, index) => {
+    const bands = levelBands(true, skill);
+    const p = probabilityVector(keyed[`check_${index}`], `第 ${index + 1} 项技能`, LEVEL_OPTIONS.slice(0, bands.length));
+    return isWealthSkill(skill)
+      ? bands.reduce((sum, band, position) => sum + p[position]! * band.representative, 0)
+      : applyReadout(p, readout);
+  });
 }
 
 export class SystemOneSkillScorer implements SkillScorer {
@@ -84,7 +86,7 @@ export class SystemOneSkillScorer implements SkillScorer {
     const result = this.ctx.cfg.backend === 'jev'
       ? await this.requestJev(state, questions)
       : await this.getLayaClient().systemOne(state, questions);
-    return levelsFromAnswers(result, request.checks.length, this.ctx.cfg.backend);
+    return levelsFromAnswers(result, request.checks.map((check) => check.skill), this.ctx.cfg.backend);
   }
 
   async close(): Promise<void> {
