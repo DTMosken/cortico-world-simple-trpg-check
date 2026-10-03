@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { SIMPLE_TRPG_CHECK_DEFAULTS } from '../src/config.ts';
 
-const JSDOM_MODULE = new URL('../../../../../Cortico/node_modules/jsdom/lib/api.js', import.meta.url).href;
-const UI_MODULE = '../../../../../Cortico/src/web/client/ui/index.ts';
+const JSDOM_MODULE = new URL('../../Cortico/node_modules/jsdom/lib/api.js', import.meta.url).href;
+const UI_MODULE = '../../Cortico/src/web/client/ui/index.ts';
 const CLIENT_MODULE = '../src/console/client.ts';
 const { JSDOM } = await import(JSDOM_MODULE) as {
   JSDOM: new (html: string, options: { url: string }) => {
