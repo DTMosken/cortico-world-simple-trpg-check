@@ -35,6 +35,14 @@ Jev 密钥保存在部署目录的 `.env` 中，配置页的“打开密钥文�
 
 “强制适配多语言”要求 agent 用英文填写请求内容，不翻译已有输入。切换判定模型或 Python 环境后需要重启进程。Laya 空闲释放时间默认 10 分钟；同一进程内共用模型时取各使用者中最长的保留时间。
 
+## World 兼容性
+
+按 [Cortico World 兼容等级](https://github.com/Pal-AI-Lab/Cortico/blob/main/docs/world-compatibility.md)，本 World 的最低与完整等级均为 **L1**。
+
+宿主须挂载工具，用 `envPromptVars()` 填充 `ENV_PROMPT.md` 并将环境描述加入 system 前缀，调用 `start(host)` / `stop()`。检定返回文本回执，Laya 或 Jev 评分由本 World 自行执行，不使用事件投递、实时输出或 `WorldHost.cognition`。
+
+挂载时须提供 `WorldContext` 的配置与密钥读取。控制台不计入等级；没有控制台时，在宿主配置中选择评分后端，并按所选后端提供 Python 环境、服务地址、依赖或密钥。
+
 ## 使用示例
 
 环境提示词会指导 agent 在结果不确定且情境具有戏剧性时调用检定工具。单项和组合检定使用 `simple_trpg_check_roll`：
