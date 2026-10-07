@@ -1,29 +1,45 @@
-# `.github/workflows/release.yml`
+<!-- Owner: .github/workflows/release.yml, .github/workflows/ci.yml -->
 
-工作流发布本仓库的 npm 包。`workflow_dispatch` 提供 patch、minor、major 三种版本增量。
+# 发布
+
+推送分支和提交 PR 会运行 CI，检查测试、类型、控制台构建、扩展契约与打包内容。npm 发布由维护者手动运行 Release。
 
 ## 检查环境
 
-工作流在 GitHub 托管的 Ubuntu runner 上使用 Node 24 和 `package.json` 声明的 pnpm 版本。Cortico 固定在 `f180d2f1144c7901a752efc7d5b14174497d1077`，用于类型、控制台 UI、测试夹具与扩展检查。
+工作流使用 GitHub 托管的 Ubuntu runner、Node.js 24 和 `package.json.packageManager` 声明的 pnpm 版本。Cortico 检查基线由 `release.yml` 中的 `CORTICO_REF` 指定；CI 读取同一值。
 
-两个仓库按以下目录关系检出；本地运行相同检查也使用这个关系：
+两个仓库按以下目录关系检出，各自执行 `pnpm install --frozen-lockfile`：
 
 ```text
 <父目录>/
   Cortico/
-  <扩展仓库>/
+  cortico-world-simple-trpg-check/
 ```
 
-两个目录各自执行 `pnpm install --frozen-lockfile`。本地开发直接使用两个仓库的实际目录。
+本地在隔离的检出目录构建控制台，避免覆盖运行中的 bot 正在使用的资源。`tests/fit.test.ts` 使用的 `evals/fit.ts` 纳入 Git；npm 文件范围由 `package.json.files` 限定。
 
-`tests/fit.test.ts` 使用的 `evals/fit.ts` 纳入 Git。npm 包的文件范围由 `package.json.files` 限定。
+## 版本 PR
 
-## 发布
+在 Actions 中选择 Release，从 `main` 运行，选择 `patch`、`minor` 或 `major`。工作流增加 `package.json.version`，执行完整检查并创建 `release/v<版本>` 分支和版本 PR，不发布 npm 或创建 tag。
 
-在 GitHub 的 Actions 页面选择 Release，选定分支与版本增量后点击 Run workflow。工作流更新版本与源码地址，执行测试、类型检查、console 构建和扩展检查，审计文件并生成 npm tarball。检查通过后，只提交 `package.json`，创建 `v<版本>` 标签，并将提交和标签一起推送到选定分支。
+版本 PR 的 CI 由工作流显式触发。仓库 Settings → Actions → General 中须允许 GitHub Actions 创建 Pull Request；工作流保留默认只读权限，在 Release job 中申请所需写权限。合并条件由主分支保护规则规定。
 
-发布使用 npm Trusted Publishing。npm 包的 Trusted Publisher 设置须填写本仓库的 GitHub 用户或组织、仓库名以及文件名 `release.yml`，允许 `npm publish`，Environment 留空。工作流未使用 npm 发布 Token。
+## 发布 npm
 
-仓库规则须允许 GitHub Actions 向选定分支提交版本变更与创建标签。推送成功后，工作流发布已生成的 tarball；发布成功后核对指定版本和 `latest`。若发布步骤失败，已推送的版本提交和标签仍然存在；修复原因后可从该标签检出并发布该版本，重新运行 Release 会再增加版本。
+合并版本 PR 后，从 `main` 再运行 Release，选择 `publish`。工作流检查并打包该提交，创建 `v<版本>` tag，再通过 npm Trusted Publishing 发布 tarball，最后核对指定版本和 `latest`。
+
+已有 tag 必须指向当前提交；指向其他提交时，需要先合并新版本 PR。同一提交已创建 tag 而 npm 尚未发布时，可修复失败原因后重试 `publish`。npm 已确认发布的版本不可重新发布。
+
+本仓库 npm Trusted Publisher 的字段为：
+
+| 字段 | 值 |
+| --- | --- |
+| Organization or user | `DTMosken` |
+| Repository | `cortico-world-simple-trpg-check` |
+| Workflow filename | `release.yml` |
+| Environment name | 留空 |
+| Allowed actions | `npm publish` |
+
+不需要配置 `NPM_TOKEN`。Trusted Publisher 需由 npm 包维护者在 npm 设置页配置。
 
 参考：[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)、[GitHub 手动运行工作流](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
