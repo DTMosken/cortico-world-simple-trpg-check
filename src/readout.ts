@@ -4,7 +4,7 @@
  * 读出是离线训练的产物（见 src/level-readout.ts 与 evals/train.ts）：运行时只做线性组合与插值，
  * 不训练、不访问网络。未训练的后端（本地 Laya 实测读不出水平证据）保持恒等读出。
  */
-import type { CheckBackend } from './config.ts';
+import { hasCalibratedReadout, type CheckBackend } from './config.ts';
 import { LEVEL_READOUT } from './level-readout.ts';
 import { levelBands } from './request.ts';
 
@@ -57,7 +57,7 @@ export function applyReadout(p: readonly number[], readout: LevelReadout): numbe
   return Math.max(0, Math.min(100, level));
 }
 
-/** 每个后端一套读出；Jev 用训练产物，本地 Laya 保持恒等。 */
-export function readoutFor(backend: CheckBackend): LevelReadout {
-  return backend === 'jev' ? LEVEL_READOUT : { kind: 'identity' };
+/** 默认 JEV 模型使用训练产物；其余模型取档位代表值的期望。 */
+export function readoutFor(backend: CheckBackend, model?: string): LevelReadout {
+  return backend === 'jev' && (model === undefined || hasCalibratedReadout(model)) ? LEVEL_READOUT : { kind: 'identity' };
 }

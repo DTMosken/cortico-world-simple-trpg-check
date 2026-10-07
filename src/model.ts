@@ -1,5 +1,6 @@
 import type { WorldContext } from 'cortico/world.ts';
 import {
+  decisionModel,
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_CUSTOM_SECRET,
   SIMPLE_TRPG_CHECK_TYPESAFE_SECRET,
@@ -58,13 +59,13 @@ export function probabilityVector(item: unknown, label: string, options: readonl
 }
 
 /** 按技能对应的标尺读出水平，返回顺序与技能列表一致。 */
-export function levelsFromAnswers(result: unknown, skills: readonly string[], backend: CheckBackend): number[] {
+export function levelsFromAnswers(result: unknown, skills: readonly string[], backend: CheckBackend, model?: string): number[] {
   if (!result || typeof result !== 'object') throw new Error('模型没有返回判定结果');
   const answers = (result as { answers?: unknown }).answers;
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('模型没有返回技能答案');
   const keyed = answers as Record<string, unknown>;
   if (Object.keys(keyed).length !== skills.length) throw new Error('模型返回的技能答案数量不匹配');
-  const readout = readoutFor(backend);
+  const readout = readoutFor(backend, model);
   return skills.map((skill, index) => {
     const bands = levelBands(true, skill);
     const p = probabilityVector(keyed[`check_${index}`], `第 ${index + 1} 项技能`, LEVEL_OPTIONS.slice(0, bands.length));
@@ -86,7 +87,7 @@ export class SystemOneSkillScorer implements SkillScorer {
     const result = this.ctx.cfg.backend === 'jev'
       ? await this.requestJev(state, questions)
       : await this.getLayaClient().systemOne(state, questions);
-    return levelsFromAnswers(result, request.checks.map((check) => check.skill), this.ctx.cfg.backend);
+    return levelsFromAnswers(result, request.checks.map((check) => check.skill), this.ctx.cfg.backend, decisionModel(this.ctx.cfg));
   }
 
   async close(): Promise<void> {
@@ -119,21 +120,21 @@ export class SystemOneSkillScorer implements SkillScorer {
         ? this.ctx.secret(SIMPLE_TRPG_CHECK_OPENROUTER_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_OPENROUTER_SECRET)
         : this.ctx.secret(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET) || this.ctx.secret(SIMPLE_TRPG_CHECK_LEGACY_TYPESAFE_SECRET)
           || this.ctx.secret(SIMPLE_TRPG_CHECK_CUSTOM_SECRET);
-    if (!apiKey) throw new Error(`${source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义 Jev' : 'TypeSafe'} API key 未配置`);
+    if (!apiKey) throw new Error(`${source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义服务' : 'TypeSafe'} API key 未配置`);
     const endpoint = source === 'openrouter' ? 'https://openrouter.ai/api/alpha/decisions'
       : source === 'custom' ? this.ctx.cfg.jevEndpoint.trim() : 'https://api.typesafe.ai/v1/systemone';
     if (source === 'custom') {
       let url: URL;
-      try { url = new URL(endpoint); } catch { throw new Error('自定义 Jev 服务地址无效'); }
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('自定义 Jev 服务地址无效');
+      try { url = new URL(endpoint); } catch { throw new Error('自定义决策服务地址无效'); }
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('自定义决策服务地址无效');
     }
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ model: source === 'openrouter' ? '~typesafe/jev-latest' : 'jev-latest', state, questions }),
+      body: JSON.stringify({ model: decisionModel(this.ctx.cfg), state, questions }),
       signal: AbortSignal.timeout(20_000),
     });
-    if (!response.ok) throw new Error(`Jev 请求失败：HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`决策请求失败：HTTP ${response.status}`);
     return response.json();
   }
 }

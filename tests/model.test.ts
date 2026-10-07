@@ -8,7 +8,7 @@ import { levelsFromAnswers, SystemOneSkillScorer } from '../src/model.ts';
 import { difficultyFromLevel } from '../src/check.ts';
 import { applyReadout, readoutFor } from '../src/readout.ts';
 import { LEVEL_OPTIONS, type CheckRequest } from '../src/request.ts';
-import { SIMPLE_TRPG_CHECK_CUSTOM_SECRET, SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
+import { DEFAULT_DECISION_MODELS, OPENROUTER_LUNA_MODEL, SIMPLE_TRPG_CHECK_CUSTOM_SECRET, SIMPLE_TRPG_CHECK_OPENROUTER_SECRET, SIMPLE_TRPG_CHECK_TYPESAFE_SECRET } from '../src/config.ts';
 
 const REQUEST: CheckRequest = {
   character: { traits: '在码头干了八年夜活', condition: '无伤，体力正常' },
@@ -22,6 +22,25 @@ const REQUEST: CheckRequest = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('System One skill scoring', () => {
+  it.each([OPENROUTER_LUNA_MODEL, 'decision/fast'])('reads an uncalibrated decision model on the skill and wealth scales', async (model) => {
+    const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
+    try {
+      const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+      ctx.cfg.backend = 'jev'; ctx.cfg.jevSource = 'openrouter'; ctx.cfg.jevModel = ` ${model} `;
+      ctx.secret = (name) => name === SIMPLE_TRPG_CHECK_OPENROUTER_SECRET ? 'test-key' : '';
+      vi.stubGlobal('fetch', async (_url: string, opts: RequestInit) => {
+        const body = JSON.parse(String(opts.body));
+        if (body.model !== model) return new Response('', { status: 404 });
+        return new Response(JSON.stringify({ answers: {
+          check_1: { type: 'choice', probabilities: { D: 1 } },
+          check_0: { type: 'choice', probabilities: { D: 1 } },
+        } }), { status: 200 });
+      });
+      const request = { ...REQUEST, checks: [REQUEST.checks[0]!, { skill: '财富', goal: '支付大额开支', evidence: '富裕' }] };
+      expect(await new SystemOneSkillScorer(ctx).score(request)).toEqual([35, 70]);
+    } finally { rmSync(scratchDir, { recursive: true, force: true }); }
+  });
+
   it('replays the captured wealth distributions on every backend', () => {
     const probabilities = [
       { A: 0.99, C: 0.01 },
@@ -91,7 +110,7 @@ describe('System One skill scoring', () => {
           state: { message: string };
           questions: Record<string, { type: string; instructions: string; criteria: Record<string, string> }>;
         };
-        expect(body.model).toBe(source === 'openrouter' ? '~typesafe/jev-latest' : 'jev-latest');
+        expect(body.model).toBe(DEFAULT_DECISION_MODELS[source]);
         expect(JSON.parse(body.state.message)).toEqual({ character: REQUEST.character, situation: REQUEST.situation });
         expect(Object.keys(body.questions)).toEqual(['check_0', 'check_1']);
         expect(body.questions.check_0?.type).toBe('choice');
@@ -126,7 +145,7 @@ describe('System One skill scoring', () => {
       ctx.secret = (name) => name === SIMPLE_TRPG_CHECK_CUSTOM_SECRET ? 'test-key' : '';
       vi.stubGlobal('fetch', () => { throw new Error('unexpected fetch'); });
       await expect(new SystemOneSkillScorer(ctx).score(REQUEST))
-        .rejects.toThrow('自定义 Jev 服务地址无效');
+        .rejects.toThrow('自定义决策服务地址无效');
     } finally {
       rmSync(scratchDir, { recursive: true, force: true });
     }

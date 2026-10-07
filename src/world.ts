@@ -13,6 +13,7 @@ import {
   type Joint,
 } from './check.ts';
 import {
+  decisionModel,
   SIMPLE_TRPG_CHECK_CONFIG_GROUP,
   SIMPLE_TRPG_CHECK_OPENROUTER_SECRET,
   SIMPLE_TRPG_CHECK_CUSTOM_SECRET,
@@ -387,7 +388,8 @@ export class SimpleTrpgCheckWorld implements World {
           ? '最近一次模型请求失败' : modelState === 'loading' ? '正在请求模型' : '尚未成功请求模型',
       }],
       badges: this.ctx.cfg.backend === 'jev'
-        ? [{ label: source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义 Jev' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' }]
+        ? [{ label: source === 'openrouter' ? 'OpenRouter' : source === 'custom' ? '自定义服务' : 'TypeSafe', value: keySet ? '密钥已配置' : '密钥未配置', tone: keySet ? 'on' : 'off' },
+          { label: '决策模型', value: decisionModel(this.ctx.cfg) }]
         : [{ label: '判定模型', value: this.ctx.cfg.backend }],
       panels: [{ id: 'config', title: '配置' }],
       invoke: async (panel, method, args) => {
@@ -433,7 +435,7 @@ export class SimpleTrpgCheckWorld implements World {
         if (method === 'openKeyFile') {
           const source = args[0];
           if (source !== this.ctx.cfg.jevSource || this.ctx.cfg.backend !== 'jev') {
-            throw new Error('Jev 来源已改变，请重试');
+            throw new Error('决策服务已改变，请重试');
           }
           const secretName = this.ctx.cfg.jevSource === 'openrouter' ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
             : this.ctx.cfg.jevSource === 'custom' ? SIMPLE_TRPG_CHECK_CUSTOM_SECRET : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
@@ -462,7 +464,7 @@ export class SimpleTrpgCheckWorld implements World {
 
   private currentModelSignature(): string {
     const { backend, jevSource, jevEndpoint, pythonExecutable } = this.ctx.cfg;
-    return `${backend}|${backend === 'jev' ? `${jevSource}|${jevSource === 'custom' ? jevEndpoint : ''}` : pythonExecutable}`;
+    return `${backend}|${backend === 'jev' ? `${jevSource}|${decisionModel(this.ctx.cfg)}|${jevSource === 'custom' ? jevEndpoint : ''}` : pythonExecutable}`;
   }
 
   /**

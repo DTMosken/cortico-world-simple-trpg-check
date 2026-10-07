@@ -1,5 +1,5 @@
 import type { ConsoleClientBundle, ConsolePanelContext } from 'cortico/web/shared/client-panel.ts';
-import { SIMPLE_TRPG_CHECK_CONFIG_GROUP, type SimpleTrpgCheckConfigSection } from '../config.ts';
+import { decisionModel, decisionModelPresets, DEFAULT_DECISION_MODELS, hasCalibratedReadout, SIMPLE_TRPG_CHECK_CONFIG_GROUP, type SimpleTrpgCheckConfigSection } from '../config.ts';
 
 interface ConfigState {
   config: SimpleTrpgCheckConfigSection;
@@ -60,20 +60,30 @@ async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
     sheet.body.appendChild(testRow);
     for (const [path, property] of Object.entries(SIMPLE_TRPG_CHECK_CONFIG_GROUP.schema.properties)) {
       const key = path.split('.').at(-1) as keyof SimpleTrpgCheckConfigSection;
-      if (config.backend !== 'jev' && (key === 'jevSource' || key === 'jevEndpoint')) continue;
+      if (config.backend !== 'jev' && (key === 'jevSource' || key === 'jevEndpoint' || key === 'jevModel')) continue;
       if (config.backend === 'jev' && (key === 'forceMultilingual' || key === 'pythonExecutable' || key === 'layaIdleTtlMinutes')) continue;
       if (key === 'jevEndpoint' && config.jevSource !== 'custom') continue;
       const value = config[key];
       let field: HTMLElement;
-      if (property.type === 'boolean') {
+      if (key === 'jevModel') {
+        const input = ui.input({ value: config.jevModel ?? '', placeholder: DEFAULT_DECISION_MODELS[config.jevSource],
+          onChange: (next) => { void save(key, next); } });
+        const presets = ui.h('datalist'); presets.id = 'trpg-decision-models'; input.setAttribute('list', presets.id);
+        for (const preset of decisionModelPresets(config.jevSource)) {
+          const option = ui.h('option'); option.value = preset.value; option.label = preset.label; presets.append(option);
+        }
+        const controls = ui.rowbar(); controls.append(input, presets); field = ui.field(property.title, controls);
+      } else if (property.type === 'boolean') {
         field = ui.checkbox(property.title, {
           checked: Boolean(value), onChange: (next) => { void save(key, next); },
         }).el;
       } else if (property.enum || property['x-options']) {
         const choices = property.enum ?? options.map((item) => item.value);
+        const labels: Record<string, string> = key === 'backend' ? { 'laya-multilingual': '本地 Laya（多语言）', laya: '本地 Laya（英文）', jev: '远程决策模型' }
+          : key === 'jevSource' ? { typesafe: 'TypeSafe', openrouter: 'OpenRouter', custom: '自定义服务' } : {};
         const entries = choices.map((choice) => ({
           value: choice,
-          label: property['x-options'] ? options.find((item) => item.value === choice)?.label ?? choice : choice,
+          label: property['x-options'] ? options.find((item) => item.value === choice)?.label ?? choice : labels[choice] ?? choice,
         }));
         if (!entries.some((item) => item.value === value)) entries.unshift({ value: String(value), label: String(value) });
         field = ui.field(property.title, ui.select({
@@ -87,7 +97,7 @@ async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
         }));
       }
       if (key === 'jevSource') {
-        const sourceName = config.jevSource === 'openrouter' ? 'OpenRouter' : config.jevSource === 'custom' ? '自定义 Jev' : 'TypeSafe';
+        const sourceName = config.jevSource === 'openrouter' ? 'OpenRouter' : config.jevSource === 'custom' ? '自定义服务' : 'TypeSafe';
         const keyStatus = ui.msgline(state.keySet ? '密钥已配置' : '密钥未配置');
         const open = ui.button(`打开 ${sourceName} 密钥文件`, {
           onClick: () => {
@@ -104,6 +114,9 @@ async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
         keyRow.append(field, keyStatus, open);
         fields.appendChild(keyRow);
       } else fields.appendChild(field);
+      if (key === 'jevModel' && !hasCalibratedReadout(decisionModel(config))) {
+        fields.appendChild(ui.msgline('未校准：技能水平按档位代表值取期望。'));
+      }
       if (key === 'backend' && config.backend !== 'jev') {
         fields.appendChild(ui.msgline('本地 Laya 检查点在本域实测读不出角色水平（难度几乎恒定在 60 上下），建议改用 Jev。', true));
       }

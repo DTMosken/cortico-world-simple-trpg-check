@@ -2,7 +2,7 @@
 
 # Simple TRPG Check
 
-Cortico 的 TRPG 技能检定 World 扩展，检定规则由COC7规则启发。agent 提供角色背景、技能证据和当前情境，Laya 或 Jev 估计角色的技能水平，扩展据此进行 d100 检定，返回骰值、结果和可直接展示的文本。
+Cortico 的 TRPG 技能检定 World 扩展，检定规则由COC7规则启发。agent 提供角色背景、技能证据和当前情境，本地或远程决策模型估计角色的技能水平，扩展据此进行 d100 检定，返回骰值、结果和可直接展示的文本。
 
 支持单项检定、组合检定、对抗检定，以及奖励骰、惩罚骰和困难／极难任务。技能名可以自定义，不需要预先填写数值角色卡。
 
@@ -19,27 +19,31 @@ corepack pnpm add --ignore-workspace cortico-world-simple-trpg-check
 
 | 判定模型 | 配置方式 |
 | --- | --- |
-| Jev | 将“判定模型”设为 `jev`，选择 TypeSafe、OpenRouter 或自定义来源，填写对应密钥。自定义来源还需配置服务地址。 |
+| 远程决策模型 | 选择 TypeSafe、OpenRouter 或自定义服务，填写对应密钥与模型 ID。自定义服务还需配置服务地址。 |
 | 多语言 Laya（默认） | 选择已安装 `laya` 的 Conda Python 环境。首次使用可能下载模型权重，后续使用本地缓存。 |
-| 英文 Laya | 将“判定模型”设为 `laya`，通过可选依赖 `@receptron/laya` 在本机运行。 |
+| 英文 Laya | 选择“本地 Laya（英文）”，通过可选依赖 `@receptron/laya` 在本机运行。 |
 
 现有评测中，本地 Laya 对不同技能水平证据的区分较弱，建议使用 Jev。选择后点击“测试连接”验证服务与密钥；该操作不掷骰。
 
-Jev 密钥保存在部署目录的 `.env` 中，配置页的“打开密钥文件”可打开该文件。填写并保存后，下一次模型请求读取密钥。
+“决策模型”输入框提供预设，也接受其他模型 ID；留空使用所选服务的默认 JEV 模型。OpenRouter 支持 Luna Decisions 预设 `openai/gpt-6-luna-decisions`。自定义服务须支持 SystemOne 请求和答案格式。配置键 `backend: "jev"`、`jevSource`、`jevEndpoint` 继续使用，模型 ID 保存在 `jevModel`。
 
-| Jev 来源 | 密钥变量 |
+默认 JEV 模型使用现有技能评分校准。Luna 与其他模型显示“未校准”，按档位代表值取期望；财富与信用评级仍使用专用标尺。
+
+决策服务密钥保存在部署目录的 `.env` 中，配置页的“打开密钥文件”可打开该文件。同一服务的模型共用密钥。填写并保存后，下一次模型请求读取密钥。
+
+| 决策服务 | 密钥变量 |
 | --- | --- |
 | TypeSafe | `CORTICO_JEV_TYPESAFE_API_KEY` |
 | OpenRouter | `CORTICO_JEV_OPENROUTER_API_KEY` |
 | 自定义 | `CORTICO_JEV_API_KEY` |
 
-“强制适配多语言”要求 agent 用英文填写请求内容，不翻译已有输入。切换判定模型或 Python 环境后需要重启进程。Laya 空闲释放时间默认 10 分钟；同一进程内共用模型时取各使用者中最长的保留时间。
+“强制适配多语言”要求 agent 用英文填写请求内容，不翻译已有输入。切换判定方式或 Python 环境后需要重启进程；远程服务与模型 ID 保存后从下一次请求生效。Laya 空闲释放时间默认 10 分钟；同一进程内共用模型时取各使用者中最长的保留时间。
 
 ## World 兼容性
 
 按 [Cortico World 兼容等级](https://github.com/Pal-AI-Lab/Cortico/blob/main/docs/world-compatibility.md)，本 World 的最低与完整等级均为 **L1**。
 
-宿主须挂载工具，用 `envPromptVars()` 填充 `ENV_PROMPT.md` 并将环境描述加入 system 前缀，调用 `start(host)` / `stop()`。检定返回文本回执，Laya 或 Jev 评分由本 World 自行执行，不使用事件投递、实时输出或 `WorldHost.cognition`。
+宿主须挂载工具，用 `envPromptVars()` 填充 `ENV_PROMPT.md` 并将环境描述加入 system 前缀，调用 `start(host)` / `stop()`。检定返回文本回执，模型评分由本 World 自行执行，不使用事件投递、实时输出或 `WorldHost.cognition`。
 
 挂载时须提供 `WorldContext` 的配置与密钥读取。控制台不计入等级；没有控制台时，在宿主配置中选择评分后端，并按所选后端提供 Python 环境、服务地址、依赖或密钥。
 

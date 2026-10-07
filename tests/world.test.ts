@@ -229,7 +229,7 @@ describe('Simple TRPG Check World', () => {
     expect(readFileSync(first.file, 'utf8')).toBe(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
     ctx.cfg.jevSource = 'openrouter';
     await expect(panel?.invoke?.('config', 'openKeyFile', ['typesafe']))
-      .rejects.toThrow('来源已改变');
+      .rejects.toThrow('服务已改变');
     await panel?.invoke?.('config', 'openKeyFile', ['openrouter']);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_OPENROUTER_SECRET}=`);
     expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
@@ -243,6 +243,26 @@ describe('Simple TRPG Check World', () => {
     await world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
     expect(world.console().lamps?.[0]?.state).toBe('online');
     ctx.cfg.backend = 'jev';
+    expect(world.console().lamps?.[0]?.state).toBe('offline');
+  });
+
+  it('clears the model lamp and rejects an active score when the model ID changes', async () => {
+    const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    ctx.cfg.backend = 'jev';
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let wait = false;
+    const scorer: SkillScorer = { async score() { if (wait) await gate; return [50]; }, async close() {} };
+    const world = new SimpleTrpgCheckWorld(ctx, scorer, () => { if (wait) throw new Error('dice were rolled'); return 20; });
+    await world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
+    expect(world.console().lamps?.[0]?.state).toBe('online');
+    wait = true;
+    const pending = world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
+    await world.console().invoke?.('config', 'save', ['jevModel', 'decision/fast']);
+    expect(world.console().lamps?.[0]?.state).toBe('offline');
+    expect(world.console().badges).toContainEqual({ label: '决策模型', value: 'decision/fast' });
+    release();
+    expect(await pending).toMatchObject({ text: expect.stringContaining('判定模型配置已改变') });
     expect(world.console().lamps?.[0]?.state).toBe('offline');
   });
 
