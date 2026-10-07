@@ -3,4 +3,5 @@ dist/
 *.log
 evals/*
 !evals/fit.ts
+.pnpm-store/
 scratch/
