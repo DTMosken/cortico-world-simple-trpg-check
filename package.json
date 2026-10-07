@@ -5,6 +5,14 @@
   "description": "Cortico 的 TRPG 技能检定 World 扩展，使用本地或远程模型评估技能水平，支持 d100 掷骰、组合与对抗检定。",
   "license": "MIT",
   "author": "DTMosken",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DTMosken/cortico-world-simple-trpg-check.git"
+  },
+  "homepage": "https://github.com/DTMosken/cortico-world-simple-trpg-check#readme",
+  "bugs": {
+    "url": "https://github.com/DTMosken/cortico-world-simple-trpg-check/issues"
+  },
   "keywords": [
     "cortico-world",
     "cortico"
