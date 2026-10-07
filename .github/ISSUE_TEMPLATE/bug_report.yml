@@ -1,0 +1,63 @@
+name: 缺陷报告
+description: 报告错误行为并提供复现信息。
+title: "[缺陷] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        一个 Issue 描述一个问题。日志、配置和截图请移除密钥、令牌和私人资料；安全漏洞通过 noreply@mosken.observer 私密报告。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 版本与运行环境
+      description: 源码检出请提供提交 SHA；使用本地评分时填写 Python 与 Laya 版本。
+      placeholder: |
+        扩展版本：
+        Cortico 版本：
+        Node.js 版本：
+        操作系统：
+        评分方式、服务与模型 ID：
+        Python / Laya 版本（如适用）：
+    validations:
+      required: true
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: 实际行为
+      description: 描述观察到的问题；检定结果异常时保留骰值与完整回执。
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: 预期行为
+      description: 说明同一输入下应如何评分、掷骰或展示结果。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤与最小输入
+      description: 提供相关配置、操作步骤和工具调用输入；角色资料只保留复现必需的内容。
+      placeholder: |
+        1. 使用以下配置……
+        2. 调用检定工具，输入为……
+        3. 观察到……
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志或配置
+      description: 提供与问题直接相关且已脱敏的片段。
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 补充信息
+      description: 可填写发生频率、截图、临时处理办法或相关 Issue 链接。
+    validations:
+      required: false
