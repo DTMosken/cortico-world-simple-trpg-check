@@ -3,13 +3,13 @@ import { OPENROUTER_LUNA_MODEL, SIMPLE_TRPG_CHECK_DEFAULTS } from '../src/config
 
 const JSDOM_MODULE = new URL('../../Cortico/node_modules/jsdom/lib/api.js', import.meta.url).href;
 const UI_MODULE = '../../Cortico/src/web/client/ui/index.ts';
-const CLIENT_MODULE = '../src/console/client.ts';
+const CLIENT_MODULE = '../src/webui/client.ts';
 const { JSDOM } = await import(JSDOM_MODULE) as {
   JSDOM: new (html: string, options: { url: string }) => {
     window: { document: any; AbortController: typeof AbortController };
   };
 };
-const { createConsoleUi } = await import(UI_MODULE);
+const { createWebUi } = await import(UI_MODULE);
 const { default: client } = await import(CLIENT_MODULE);
 
 it('places the test first and shows only settings for the selected model', async () => {
@@ -17,7 +17,7 @@ it('places the test first and shows only settings for the selected model', async
   const controller = new window.AbortController();
   const config = { ...SIMPLE_TRPG_CHECK_DEFAULTS };
   const root = window.document.getElementById('root')!;
-  const ui = createConsoleUi({
+  const ui = createWebUi({
     doc: window.document, overlayHost: window.document.body, signal: controller.signal,
     memo: { get: <T>(_key: string, fallback: T): T => fallback, set: () => {} },
   });
@@ -54,7 +54,7 @@ it('saves preset and custom model IDs while retaining the service key', async ()
   const controller = new window.AbortController();
   const config = { ...SIMPLE_TRPG_CHECK_DEFAULTS, backend: 'jev' as const, jevSource: 'openrouter' as const };
   const root = window.document.getElementById('root')!;
-  const ui = createConsoleUi({ doc: window.document, overlayHost: window.document.body, signal: controller.signal,
+  const ui = createWebUi({ doc: window.document, overlayHost: window.document.body, signal: controller.signal,
     memo: { get: <T>(_key: string, fallback: T): T => fallback, set() {} } });
   await client.panels.config.mount({ root, ui, signal: controller.signal,
     invoke: async (method: string, args: unknown[]) => {

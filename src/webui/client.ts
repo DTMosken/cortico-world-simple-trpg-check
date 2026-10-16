@@ -1,4 +1,4 @@
-import type { ConsoleClientBundle, ConsolePanelContext } from 'cortico/web/shared/client-panel.ts';
+import type { WebUiClientBundle, WebUiPanelContext } from 'cortico/web/shared/client-panel.ts';
 import { decisionModel, decisionModelPresets, DEFAULT_DECISION_MODELS, hasCalibratedReadout, SIMPLE_TRPG_CHECK_CONFIG_GROUP, type SimpleTrpgCheckConfigSection } from '../config.ts';
 
 interface ConfigState {
@@ -6,7 +6,7 @@ interface ConfigState {
   keySet: boolean;
 }
 
-async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
+async function mountConfig(ctx: WebUiPanelContext): Promise<void> {
   const { ui } = ctx;
   const options = await ctx.invoke<Array<{ value: string; label: string }>>('options');
   let state = await ctx.invoke<ConfigState>('state');
@@ -128,5 +128,5 @@ async function mountConfig(ctx: ConsolePanelContext): Promise<void> {
   }
 }
 
-const client: ConsoleClientBundle = { panels: { config: { mount: mountConfig } } };
+const client: WebUiClientBundle = { panels: { config: { mount: mountConfig } } };
 export default client;

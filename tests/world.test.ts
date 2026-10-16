@@ -196,13 +196,13 @@ describe('Simple TRPG Check World', () => {
   it('saves declared fields through the config panel and rejects invalid values', async () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
     const world = new SimpleTrpgCheckWorld(ctx);
-    expect(world.console().config).toBeUndefined();
-    expect(await world.console().invoke?.('config', 'save', ['backend', 'jev']))
+    expect(world.webUi().config).toBeUndefined();
+    expect(await world.webUi().invoke?.('config', 'save', ['backend', 'jev']))
       .toMatchObject({ config: { backend: 'jev' } });
     expect(ctx.cfg.backend).toBe('jev');
-    await expect(world.console().invoke?.('config', 'save', ['backend', 'invalid']))
+    await expect(world.webUi().invoke?.('config', 'save', ['backend', 'invalid']))
       .rejects.toThrow('配置值无效');
-    await expect(world.console().invoke?.('config', 'save', ['enabled', false]))
+    await expect(world.webUi().invoke?.('config', 'save', ['enabled', false]))
       .rejects.toThrow('未知配置项');
   });
 
@@ -212,7 +212,7 @@ describe('Simple TRPG Check World', () => {
     const opened: string[] = [];
     const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20, (file) => { opened.push(file); });
-    const panel = world.console?.();
+    const panel = world.webUi?.();
     expect(panel?.panels).toEqual([{ id: 'config', title: '配置' }]);
     expect(await panel?.invoke?.('config', 'state', [])).toMatchObject({ config: { jevSource: 'typesafe' }, keySet: false });
     const first = await panel?.invoke?.('config', 'openKeyFile', ['typesafe']) as { file: string };
@@ -239,11 +239,11 @@ describe('Simple TRPG Check World', () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
     const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20);
-    expect(world.console().lamps?.[0]?.state).toBe('offline');
+    expect(world.webUi().lamps?.[0]?.state).toBe('offline');
     await world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
-    expect(world.console().lamps?.[0]?.state).toBe('online');
+    expect(world.webUi().lamps?.[0]?.state).toBe('online');
     ctx.cfg.backend = 'jev';
-    expect(world.console().lamps?.[0]?.state).toBe('offline');
+    expect(world.webUi().lamps?.[0]?.state).toBe('offline');
   });
 
   it('clears the model lamp and rejects an active score when the model ID changes', async () => {
@@ -255,15 +255,15 @@ describe('Simple TRPG Check World', () => {
     const scorer: SkillScorer = { async score() { if (wait) await gate; return [50]; }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => { if (wait) throw new Error('dice were rolled'); return 20; });
     await world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
-    expect(world.console().lamps?.[0]?.state).toBe('online');
+    expect(world.webUi().lamps?.[0]?.state).toBe('online');
     wait = true;
     const pending = world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
-    await world.console().invoke?.('config', 'save', ['jevModel', 'decision/fast']);
-    expect(world.console().lamps?.[0]?.state).toBe('offline');
-    expect(world.console().badges).toContainEqual({ label: '决策模型', value: 'decision/fast' });
+    await world.webUi().invoke?.('config', 'save', ['jevModel', 'decision/fast']);
+    expect(world.webUi().lamps?.[0]?.state).toBe('offline');
+    expect(world.webUi().badges).toContainEqual({ label: '决策模型', value: 'decision/fast' });
     release();
     expect(await pending).toMatchObject({ text: expect.stringContaining('判定模型配置已改变') });
-    expect(world.console().lamps?.[0]?.state).toBe('offline');
+    expect(world.webUi().lamps?.[0]?.state).toBe('offline');
   });
 
   it('tests the selected model with one score, lights the lamp, and never rolls dice', async () => {
@@ -282,20 +282,20 @@ describe('Simple TRPG Check World', () => {
       async close() {},
     };
     const world = new SimpleTrpgCheckWorld(ctx, scorer, () => { throw new Error('dice were rolled'); });
-    expect(world.console().panels).toEqual([{ id: 'config', title: '配置' }]);
-    expect(await world.console().invoke?.('config', 'testConnection', [])).toEqual({ ok: true });
-    expect(world.console().lamps?.[0]?.state).toBe('online');
+    expect(world.webUi().panels).toEqual([{ id: 'config', title: '配置' }]);
+    expect(await world.webUi().invoke?.('config', 'testConnection', [])).toEqual({ ok: true });
+    expect(world.webUi().lamps?.[0]?.state).toBe('online');
   });
 
   it('reports a failed model test and shows an error lamp', async () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
     const scorer: SkillScorer = { async score() { throw new Error('connection refused'); }, async close() {} };
     const world = new SimpleTrpgCheckWorld(ctx, scorer);
-    expect(await world.console().invoke?.('config', 'testConnection', [])).toEqual({
+    expect(await world.webUi().invoke?.('config', 'testConnection', [])).toEqual({
       ok: false,
       error: 'connection refused',
     });
-    expect(world.console().lamps?.[0]?.state).toBe('error');
+    expect(world.webUi().lamps?.[0]?.state).toBe('error');
   });
 
   it('never asks the model when the compensation crosses the auto threshold', async () => {

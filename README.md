@@ -8,7 +8,7 @@ Cortico 的 TRPG 技能检定 World 扩展，检定规则由COC7规则启发。a
 
 ## 安装与配置
 
-要求 Node.js 22 或更新版本，以及 Cortico World API 5。在 Cortico 仓库的 `extensions/` 目录安装：
+要求 Node.js 22 或更新版本，以及 Cortico World API 6。在 Cortico 仓库的 `extensions/` 目录安装：
 
 ```powershell
 Set-Location "<Cortico 仓库路径>\extensions"
@@ -112,7 +112,7 @@ corepack pnpm install
 corepack pnpm test
 corepack pnpm typecheck
 corepack pnpm typecheck:web
-corepack pnpm build:console
+corepack pnpm build:webui
 ```
 
 在 Cortico 仓库根目录运行 `corepack pnpm check:extension <本包绝对路径>` 验证扩展。构建控制台前需停止本机正在运行的 bot 进程。
@@ -120,3 +120,7 @@ corepack pnpm build:console
 评测方法、语料和离线读出训练见仓库内的 `evals/README.md`。运行时使用包内已有的读出表；`evals/` 和 `tests/` 不随 npm 包发布。
 
 MIT License，见 [LICENSE](LICENSE)。
+
+## Cortico 0.2.1
+
+发布前从 Cortico 仓库运行 `pnpm describe:extension <本包目录>` 和 `pnpm check:extension <本包目录>`。工具与默认提示词通过 `describe.json` 提供给扩展市场；发布规则见 [AGENTS.md](AGENTS.md)，更新说明见 [CHANGELOG.md](CHANGELOG.md)。
