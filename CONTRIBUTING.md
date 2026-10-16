@@ -51,7 +51,7 @@ corepack pnpm run typecheck:web
 git diff --check
 ```
 
-控制台变更还需在隔离的检出目录执行 `corepack pnpm run build:console`，避免覆盖运行中的 bot 正在使用的资源。构建后，从相邻的 Cortico 目录检查扩展契约：
+控制台变更还需在隔离的检出目录执行 `corepack pnpm run build:webui`，避免覆盖运行中的 bot 正在使用的资源。构建后，从相邻的 Cortico 目录检查扩展契约：
 
 ```powershell
 corepack pnpm --dir ../Cortico check:extension ../cortico-world-simple-trpg-check

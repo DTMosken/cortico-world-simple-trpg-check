@@ -1,7 +1,7 @@
-import type { WorldDefinition } from 'cortico/world.ts';
+import { describeTools, type WorldDefinition } from 'cortico/world.ts';
 import { discoverCondaPythonOptions } from './conda-environments.ts';
 import { SIMPLE_TRPG_CHECK_DEFAULTS, type SimpleTrpgCheckConfigSection } from './config.ts';
-import { SimpleTrpgCheckWorld } from './world.ts';
+import { SIMPLE_TRPG_CHECK_TOOL_DECLS, SimpleTrpgCheckWorld } from './world.ts';
 
 export const SIMPLE_TRPG_CHECK: WorldDefinition<SimpleTrpgCheckConfigSection> = {
   id: 'simple-trpg-check',
@@ -9,4 +9,5 @@ export const SIMPLE_TRPG_CHECK: WorldDefinition<SimpleTrpgCheckConfigSection> = 
   defaults: () => ({ ...SIMPLE_TRPG_CHECK_DEFAULTS }),
   configOptions: (kind) => kind === 'simple-trpg-check-conda-python' ? discoverCondaPythonOptions() : [],
   create: (ctx) => new SimpleTrpgCheckWorld(ctx),
+  describe: { tools: describeTools(SIMPLE_TRPG_CHECK_TOOL_DECLS, {}), events: [] },
 };

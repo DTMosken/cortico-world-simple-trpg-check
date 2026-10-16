@@ -1,6 +1,7 @@
+import type { ToolSpec } from 'cortico/core/types.ts';
 import { randomInt } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import type { ToolDef, ToolOutcome, World, WorldConsoleDecl, WorldHost } from 'cortico/core/types.ts';
+import type { ToolDef, ToolOutcome, World, WorldWebUiDecl, WorldHost } from 'cortico/core/types.ts';
 import type { WorldContext } from 'cortico/world.ts';
 import {
   autoVerdict,
@@ -189,193 +190,15 @@ export class SimpleTrpgCheckWorld implements World {
 
   tools(): ToolDef[] {
     return [{
-      name: 'simple_trpg_check_roll',
-      description: '按 checks 里的人物证据判定角色在每项技能上的水平作为难度，再逐项掷骰出结果。回执末尾的「显示：」块就是面向用户的完整格式，照抄即可。'
-        + 'checks[i].bonus 是情景代偿的奖励/惩罚骰：整数，标尺 -2（巨大劣势）…2（巨大优势），0 或省略即基准；掷 1+|bonus| 颗，优势取最低、劣势取最高，|bonus|≥3 时不调用判定模型、直接自动成功/失败。'
-        + 'checks[i].grade 取 1（困难）或 2（极难），把档位标签整体下压；只在难度本身是任务因素时使用。'
-        + '顶层 joint 取 and/or 把本调用里的所有技能合成一次投掷（and 取最小难度与最小 bonus、or 取最大），出现时至少两项技能且不得带 grade。'
-        + '模型失败、答案无效、输入超出预算或字段非法时不掷骰。',
-      tags: ['act'],
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          character: {
-            type: 'object',
-            additionalProperties: false,
-            description: '角色层面、跨技能共享的事实。',
-            properties: {
-              traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
-              condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
-            },
-            required: ['traits', 'condition'],
-          },
-          situation: {
-            type: 'object',
-            additionalProperties: false,
-            description: '这一时刻的情境；某项确实无影响就写“无”，不要省略。',
-            properties: {
-              weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
-              gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
-              info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
-              time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
-              senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
-            },
-            required: ['weather', 'gear', 'info', 'time', 'senses'],
-          },
-          checks: {
-            type: 'array',
-            minItems: 1,
-            description: '按判定顺序列出本时刻的技能；顺序只决定回执排列，不表示依赖关系。',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
-                goal: { type: 'string', minLength: 1, maxLength: 300, description: '这项技能要达成的直接结果。' },
-                evidence: { type: 'string', minLength: 1, maxLength: 300, description: '角色在该技能上的水平证据；不写数字、不写档位名，也不把情境写进去。' },
-                bonus: {
-                  type: 'integer',
-                  description: '情景代偿的奖励/惩罚骰，整数；标尺 -2（巨大劣势）…2（巨大优势），0 或省略即基准。'
-                    + '填合计数：情境修正与本项花掉的 banked 奖励骰 1:1 抵消后相加。|bonus|≥3 时不调用判定模型，直接自动成功/失败。',
-                },
-                grade: {
-                  type: 'integer',
-                  enum: [1, 2],
-                  description: '难度等级：1 = 困难（困难成功视为普通成功、成功视为失败），2 = 极难（极难成功视为成功、其余视为失败）。'
-                    + '只用于难度本身是任务因素的场合；大成功与大失败不受影响；与顶层 joint 不能同时出现。',
-                },
-              },
-              required: ['skill', 'goal', 'evidence'],
-            },
-          },
-          joint: {
-            type: 'string',
-            enum: ['and', 'or'],
-            description: '组合检定：and = 列表里每项都要成功（按最小难度与最小 bonus 判），or = 任意一项成功即可（按最大难度与最大 bonus 判）。'
-              + '出现时 checks 至少两项，且各项不得带 grade。',
-          },
-        },
-        required: ['character', 'situation', 'checks'],
-      },
-      handler: (args) => this.runCheck(args),
+      ...SIMPLE_TRPG_CHECK_TOOL_DECLS[0],
+      handler: (args) => this.runCheck(args)
     }, {
-      name: 'simple_trpg_check_roll_contest',
-      description: '对抗检定：分别判定我方与对方的同一时刻水平，比成功等级定胜负。actor 与 opponent 各写完整一套（name、traits、condition、situation 五维、checks）；'
-        + '每侧各发一次判定请求，任一侧失败则整次失败且不掷骰。bonus 与 joint 挂在侧上：每侧只投一次骰，侧内 checks 多于一项时必须 joint。不支持 grade。'
-        + '自动判定按序短路：我方 bonus≥3 → 我方胜；对方≤-3 → 我方胜；我方≤-3 → 对方胜；对方≥3 → 对方胜。命中时两侧都不调用判定模型，未定调的一侧显示「跳过检定」。'
-        + '比档：大成功>极难>困难>普通成功>普通失败>大失败，同级比难度数值高者胜、相等则我方胜。对抗不触发奖励骰。',
-      tags: ['act'],
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          actor: {
-            type: 'object',
-            additionalProperties: false,
-            description: '我方；一份完整的判定请求。',
-            properties: {
-              name: { type: 'string', minLength: 1, maxLength: 120, description: '我方角色的名字，用于回执与显示串。' },
-              traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
-              condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
-              situation: {
-                type: 'object',
-                additionalProperties: false,
-                description: '我方所面对的处境；某项确实无影响就写“无”，不要省略。',
-                properties: {
-                  weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
-                  gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
-                  info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
-                  time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
-                  senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
-                },
-                required: ['weather', 'gear', 'info', 'time', 'senses'],
-              },
-              checks: {
-                type: 'array',
-                minItems: 1,
-                description: '参与对抗的技能；多于一项时必须同时给 joint。',
-                items: {
-                  type: 'object',
-                  additionalProperties: false,
-                  properties: {
-                    skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
-                    goal: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧要靠它达到的直接结果。' },
-                    evidence: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧在该技能上的水平证据；不写数字与档位名。' },
-                  },
-                  required: ['skill', 'goal', 'evidence'],
-                },
-              },
-              joint: {
-                type: 'string',
-                enum: ['and', 'or'],
-                description: '这一侧的组合检定：and 取最小难度、or 取最大。侧内 checks 多于一项时必须指定。',
-              },
-              bonus: {
-                type: 'integer',
-                description: '这一侧的奖励/惩罚骰合计值：情境修正 + 这一侧花掉的 banked 奖励骰，0 或省略即基准。'
-                  + '|bonus|≥3 时两侧都不调用判定模型，直接定胜负。',
-              },
-            },
-            required: ['name', 'traits', 'condition', 'situation', 'checks'],
-          },
-          opponent: {
-            type: 'object',
-            additionalProperties: false,
-            description: '对方；与 actor 同形，写对方自己的处境与证据。',
-            properties: {
-              name: { type: 'string', minLength: 1, maxLength: 120, description: '对方的名字，用于回执与显示串。' },
-              traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
-              condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
-              situation: {
-                type: 'object',
-                additionalProperties: false,
-                description: '对方所面对的处境；某项确实无影响就写“无”，不要省略。',
-                properties: {
-                  weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
-                  gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
-                  info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
-                  time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
-                  senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
-                },
-                required: ['weather', 'gear', 'info', 'time', 'senses'],
-              },
-              checks: {
-                type: 'array',
-                minItems: 1,
-                description: '参与对抗的技能；多于一项时必须同时给 joint。',
-                items: {
-                  type: 'object',
-                  additionalProperties: false,
-                  properties: {
-                    skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
-                    goal: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧要靠它达到的直接结果。' },
-                    evidence: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧在该技能上的水平证据；不写数字与档位名。' },
-                  },
-                  required: ['skill', 'goal', 'evidence'],
-                },
-              },
-              joint: {
-                type: 'string',
-                enum: ['and', 'or'],
-                description: '这一侧的组合检定：and 取最小难度、or 取最大。侧内 checks 多于一项时必须指定。',
-              },
-              bonus: {
-                type: 'integer',
-                description: '这一侧的奖励/惩罚骰合计值：情境修正 + 这一侧花掉的 banked 奖励骰，0 或省略即基准。'
-                  + '|bonus|≥3 时两侧都不调用判定模型，直接定胜负。',
-              },
-            },
-            required: ['name', 'traits', 'condition', 'situation', 'checks'],
-          },
-        },
-        required: ['actor', 'opponent'],
-      },
+      ...SIMPLE_TRPG_CHECK_TOOL_DECLS[1],
       handler: (args) => this.runContest(args),
     }];
   }
 
-  console(): WorldConsoleDecl {
+  webUi(): WorldWebUiDecl {
     const source = this.ctx.cfg.jevSource;
     const keySet = this.hasJevKey();
     const signature = this.currentModelSignature();
@@ -590,3 +413,190 @@ export class SimpleTrpgCheckWorld implements World {
     }
   }
 }
+
+export const SIMPLE_TRPG_CHECK_TOOL_DECLS: ToolSpec[] = [
+  {
+    name: 'simple_trpg_check_roll',
+    description: '按 checks 里的人物证据判定角色在每项技能上的水平作为难度，再逐项掷骰出结果。回执末尾的「显示：」块就是面向用户的完整格式，照抄即可。'
+      + 'checks[i].bonus 是情景代偿的奖励/惩罚骰：整数，标尺 -2（巨大劣势）…2（巨大优势），0 或省略即基准；掷 1+|bonus| 颗，优势取最低、劣势取最高，|bonus|≥3 时不调用判定模型、直接自动成功/失败。'
+      + 'checks[i].grade 取 1（困难）或 2（极难），把档位标签整体下压；只在难度本身是任务因素时使用。'
+      + '顶层 joint 取 and/or 把本调用里的所有技能合成一次投掷（and 取最小难度与最小 bonus、or 取最大），出现时至少两项技能且不得带 grade。'
+      + '模型失败、答案无效、输入超出预算或字段非法时不掷骰。',
+    tags: ['act'],
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        character: {
+          type: 'object',
+          additionalProperties: false,
+          description: '角色层面、跨技能共享的事实。',
+          properties: {
+            traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
+            condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
+          },
+          required: ['traits', 'condition'],
+        },
+        situation: {
+          type: 'object',
+          additionalProperties: false,
+          description: '这一时刻的情境；某项确实无影响就写“无”，不要省略。',
+          properties: {
+            weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
+            gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
+            info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
+            time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
+            senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
+          },
+          required: ['weather', 'gear', 'info', 'time', 'senses'],
+        },
+        checks: {
+          type: 'array',
+          minItems: 1,
+          description: '按判定顺序列出本时刻的技能；顺序只决定回执排列，不表示依赖关系。',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
+              goal: { type: 'string', minLength: 1, maxLength: 300, description: '这项技能要达成的直接结果。' },
+              evidence: { type: 'string', minLength: 1, maxLength: 300, description: '角色在该技能上的水平证据；不写数字、不写档位名，也不把情境写进去。' },
+              bonus: {
+                type: 'integer',
+                description: '情景代偿的奖励/惩罚骰，整数；标尺 -2（巨大劣势）…2（巨大优势），0 或省略即基准。'
+                  + '填合计数：情境修正与本项花掉的 banked 奖励骰 1:1 抵消后相加。|bonus|≥3 时不调用判定模型，直接自动成功/失败。',
+              },
+              grade: {
+                type: 'integer',
+                enum: [1, 2],
+                description: '难度等级：1 = 困难（困难成功视为普通成功、成功视为失败），2 = 极难（极难成功视为成功、其余视为失败）。'
+                  + '只用于难度本身是任务因素的场合；大成功与大失败不受影响；与顶层 joint 不能同时出现。',
+              },
+            },
+            required: ['skill', 'goal', 'evidence'],
+          },
+        },
+        joint: {
+          type: 'string',
+          enum: ['and', 'or'],
+          description: '组合检定：and = 列表里每项都要成功（按最小难度与最小 bonus 判），or = 任意一项成功即可（按最大难度与最大 bonus 判）。'
+            + '出现时 checks 至少两项，且各项不得带 grade。',
+        },
+      },
+      required: ['character', 'situation', 'checks'],
+    }
+  },
+  {
+    name: 'simple_trpg_check_roll_contest',
+    description: '对抗检定：分别判定我方与对方的同一时刻水平，比成功等级定胜负。actor 与 opponent 各写完整一套（name、traits、condition、situation 五维、checks）；'
+      + '每侧各发一次判定请求，任一侧失败则整次失败且不掷骰。bonus 与 joint 挂在侧上：每侧只投一次骰，侧内 checks 多于一项时必须 joint。不支持 grade。'
+      + '自动判定按序短路：我方 bonus≥3 → 我方胜；对方≤-3 → 我方胜；我方≤-3 → 对方胜；对方≥3 → 对方胜。命中时两侧都不调用判定模型，未定调的一侧显示「跳过检定」。'
+      + '比档：大成功>极难>困难>普通成功>普通失败>大失败，同级比难度数值高者胜、相等则我方胜。对抗不触发奖励骰。',
+    tags: ['act'],
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        actor: {
+          type: 'object',
+          additionalProperties: false,
+          description: '我方；一份完整的判定请求。',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 120, description: '我方角色的名字，用于回执与显示串。' },
+            traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
+            condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
+            situation: {
+              type: 'object',
+              additionalProperties: false,
+              description: '我方所面对的处境；某项确实无影响就写“无”，不要省略。',
+              properties: {
+                weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
+                gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
+                info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
+                time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
+                senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
+              },
+              required: ['weather', 'gear', 'info', 'time', 'senses'],
+            },
+            checks: {
+              type: 'array',
+              minItems: 1,
+              description: '参与对抗的技能；多于一项时必须同时给 joint。',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
+                  goal: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧要靠它达到的直接结果。' },
+                  evidence: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧在该技能上的水平证据；不写数字与档位名。' },
+                },
+                required: ['skill', 'goal', 'evidence'],
+              },
+            },
+            joint: {
+              type: 'string',
+              enum: ['and', 'or'],
+              description: '这一侧的组合检定：and 取最小难度、or 取最大。侧内 checks 多于一项时必须指定。',
+            },
+            bonus: {
+              type: 'integer',
+              description: '这一侧的奖励/惩罚骰合计值：情境修正 + 这一侧花掉的 banked 奖励骰，0 或省略即基准。'
+                + '|bonus|≥3 时两侧都不调用判定模型，直接定胜负。',
+            },
+          },
+          required: ['name', 'traits', 'condition', 'situation', 'checks'],
+        },
+        opponent: {
+          type: 'object',
+          additionalProperties: false,
+          description: '对方；与 actor 同形，写对方自己的处境与证据。',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 120, description: '对方的名字，用于回执与显示串。' },
+            traits: { type: 'string', minLength: 1, maxLength: 600, description: '长期特质、背景、词条。' },
+            condition: { type: 'string', minLength: 1, maxLength: 600, description: '伤势、疲劳、体温、精神与消耗状态。' },
+            situation: {
+              type: 'object',
+              additionalProperties: false,
+              description: '对方所面对的处境；某项确实无影响就写“无”，不要省略。',
+              properties: {
+                weather: { type: 'string', minLength: 1, maxLength: 600, description: '天气与介质。' },
+                gear: { type: 'string', minLength: 1, maxLength: 600, description: '工具与装备。' },
+                info: { type: 'string', minLength: 1, maxLength: 600, description: '已知信息与资料的秩序。' },
+                time: { type: 'string', minLength: 1, maxLength: 600, description: '时限。' },
+                senses: { type: 'string', minLength: 1, maxLength: 600, description: '可见度与感官条件。' },
+              },
+              required: ['weather', 'gear', 'info', 'time', 'senses'],
+            },
+            checks: {
+              type: 'array',
+              minItems: 1,
+              description: '参与对抗的技能；多于一项时必须同时给 joint。',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  skill: { type: 'string', minLength: 1, maxLength: 120, description: '技能名。' },
+                  goal: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧要靠它达到的直接结果。' },
+                  evidence: { type: 'string', minLength: 1, maxLength: 300, description: '这一侧在该技能上的水平证据；不写数字与档位名。' },
+                },
+                required: ['skill', 'goal', 'evidence'],
+              },
+            },
+            joint: {
+              type: 'string',
+              enum: ['and', 'or'],
+              description: '这一侧的组合检定：and 取最小难度、or 取最大。侧内 checks 多于一项时必须指定。',
+            },
+            bonus: {
+              type: 'integer',
+              description: '这一侧的奖励/惩罚骰合计值：情境修正 + 这一侧花掉的 banked 奖励骰，0 或省略即基准。'
+                + '|bonus|≥3 时两侧都不调用判定模型，直接定胜负。',
+            },
+          },
+          required: ['name', 'traits', 'condition', 'situation', 'checks'],
+        },
+      },
+      required: ['actor', 'opponent'],
+    }
+  }
+];
