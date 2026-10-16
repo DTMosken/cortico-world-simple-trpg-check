@@ -33,7 +33,7 @@ export interface SimpleTrpgCheckConfigSection {
 
 export const SIMPLE_TRPG_CHECK_DEFAULTS: SimpleTrpgCheckConfigSection = {
   enabled: false,
-  backend: 'laya-multilingual',
+  backend: 'jev',
   jevSource: 'typesafe',
   jevEndpoint: '',
   jevModel: '',

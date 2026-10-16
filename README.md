@@ -1,10 +1,12 @@
-<!-- Owner: src/definition.ts, src/world.ts, src/config.ts, src/request.ts, src/model.ts, src/ENV_PROMPT.md, src/display.ts, src/contest.ts -->
+<!-- Owner: src/definition.ts, src/world.ts, src/config.ts, src/request.ts, src/model.ts, src/multilingual-laya.ts, src/ENV_PROMPT.md, src/display.ts, src/contest.ts -->
 
 # Simple TRPG Check
 
 Cortico 的 TRPG 技能检定 World 扩展，检定规则由COC7规则启发。agent 提供角色背景、技能证据和当前情境，本地或远程决策模型估计角色的技能水平，扩展据此进行 d100 检定，返回骰值、结果和可直接展示的文本。
 
 支持单项检定、组合检定、对抗检定，以及奖励骰、惩罚骰和困难／极难任务。技能名可以自定义，不需要预先填写数值角色卡。
+
+使用前须配置评分后端。默认使用远程 Jev，需填写服务密钥；使用本地 Laya 时须安装对应依赖或 Python 环境。
 
 ## 安装与配置
 
@@ -19,11 +21,13 @@ corepack pnpm add --ignore-workspace cortico-world-simple-trpg-check
 
 | 判定模型 | 配置方式 |
 | --- | --- |
-| 远程决策模型 | 选择 TypeSafe、OpenRouter 或自定义服务，填写对应密钥与模型 ID。自定义服务还需配置服务地址。 |
-| 多语言 Laya（默认） | 选择已安装 `laya` 的 Conda Python 环境。首次使用可能下载模型权重，后续使用本地缓存。 |
+| 远程 Jev（默认） | 选择 TypeSafe、OpenRouter 或自定义服务，填写对应密钥与模型 ID。自定义服务还需配置服务地址。 |
+| 多语言 Laya | 选择已安装 `laya` 的 Conda Python 环境。首次使用可能下载模型权重，后续使用本地缓存。 |
 | 英文 Laya | 选择“本地 Laya（英文）”，通过可选依赖 `@receptron/laya` 在本机运行。 |
 
 现有评测中，本地 Laya 对不同技能水平证据的区分较弱，建议使用 Jev。选择后点击“测试连接”验证服务与密钥；该操作不掷骰。
+
+部署中已保存的 `backend` 保持原值；未配置该键时使用 Jev。需要保留原默认后端的部署应显式设置 `worlds.simple-trpg-check.backend: "laya-multilingual"`。
 
 “决策模型”输入框提供预设，也接受其他模型 ID；留空使用所选服务的默认 JEV 模型。OpenRouter 支持 Luna Decisions 预设 `openai/gpt-6-luna-decisions`。自定义服务须支持 SystemOne 请求和答案格式。配置键 `backend: "jev"`、`jevSource`、`jevEndpoint` 继续使用，模型 ID 保存在 `jevModel`。
 

@@ -9,7 +9,7 @@ export interface MultilingualLayaModel {
   close(): Promise<void>;
 }
 
-class PythonLayaModel implements MultilingualLayaModel {
+export class PythonLayaModel implements MultilingualLayaModel {
   private nextId = 0;
   private readonly pending = new Map<string, { resolve(value: unknown): void; reject(error: Error): void }>();
   private readonly ready: Promise<void>;
@@ -39,6 +39,7 @@ class PythonLayaModel implements MultilingualLayaModel {
       });
       worker.once('error', () => { clearTimeout(timeout); reject(new Error('Python 进程无法启动')); });
       worker.once('exit', (code) => {
+        this.closed = true;
         clearTimeout(timeout);
         const error = new Error(`Laya multilingual 进程已退出：${code ?? 'unknown'}`);
         reject(error);

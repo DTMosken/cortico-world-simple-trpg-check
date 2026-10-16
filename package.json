@@ -27,7 +27,10 @@
     "api": 6,
     "webUiClient": "dist/webui.js",
     "tags": [
-      "game"
+      "game",
+      "external-setup",
+      "local",
+      "requires-key"
     ],
     "describe": "describe.json"
   },

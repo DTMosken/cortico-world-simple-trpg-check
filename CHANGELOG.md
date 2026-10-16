@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Reject pending and subsequent requests when the multilingual Laya worker exits.
+- Default to Jev; document backend setup and retaining an existing Laya selection.
+- Declare the official external-setup, local and requires-key tags.
+
 ## 0.4.0 - 2026-10-16
 
 - Target Cortico 0.2.1 and world contract 6.
