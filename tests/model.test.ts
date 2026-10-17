@@ -22,6 +22,14 @@ const REQUEST: CheckRequest = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('System One skill scoring', () => {
+  it('requires a service key for the default Jev backend before scoring', async () => {
+    const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-default-model-'));
+    try {
+      const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+      await expect(new SystemOneSkillScorer(ctx).score(REQUEST)).rejects.toThrow('TypeSafe API key 未配置');
+    } finally { rmSync(scratchDir, { recursive: true, force: true }); }
+  });
+
   it.each([OPENROUTER_LUNA_MODEL, 'decision/fast'])('reads an uncalibrated decision model on the skill and wealth scales', async (model) => {
     const scratchDir = mkdtempSync(join(tmpdir(), 'trpg-model-'));
     try {

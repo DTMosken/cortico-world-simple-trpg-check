@@ -1,6 +1,6 @@
 {
   "name": "cortico-world-simple-trpg-check",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "Cortico 的 TRPG 技能检定 World 扩展，使用本地或远程模型评估技能水平，支持 d100 掷骰、组合与对抗检定。",
   "license": "MIT",
@@ -27,7 +27,10 @@
     "api": 6,
     "webUiClient": "dist/webui.js",
     "tags": [
-      "game"
+      "game",
+      "external-setup",
+      "local",
+      "requires-key"
     ],
     "describe": "describe.json"
   },

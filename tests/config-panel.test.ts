@@ -33,6 +33,12 @@ it('places the test first and shows only settings for the selected model', async
     refresh: async () => {},
   } as never);
   expect(root.textContent!.indexOf('测试连接')).toBeLessThan(root.textContent!.indexOf('判定方式'));
+  expect(root.textContent).toContain('决策服务');
+  expect(root.textContent).toContain('密钥未配置');
+  expect(root.textContent).not.toContain('Laya 空闲释放时间');
+  config.backend = 'laya-multilingual';
+  poll();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(root.textContent).toContain('Laya 空闲释放时间');
   expect(root.textContent).not.toContain('决策服务');
   config.backend = 'jev';

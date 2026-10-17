@@ -242,7 +242,7 @@ describe('Simple TRPG Check World', () => {
     expect(world.webUi().lamps?.[0]?.state).toBe('offline');
     await world.tools()[0]!.handler(SINGLE_CHECK_ARGS, {} as ToolCallContext);
     expect(world.webUi().lamps?.[0]?.state).toBe('online');
-    ctx.cfg.backend = 'jev';
+    ctx.cfg.backend = 'laya-multilingual';
     expect(world.webUi().lamps?.[0]?.state).toBe('offline');
   });
 
