@@ -26,7 +26,7 @@
 
 ## 发布 npm
 
-合并版本 PR 后，从 `main` 再运行 Release，选择 `publish`。工作流检查并打包该提交，创建 `v<版本>` tag，再通过 npm Trusted Publishing 发布 tarball，最后核对指定版本和 `latest`。
+合并版本 PR 后，从 `main` 再运行 Release，选择 `publish`。工作流检查并打包该提交，创建 `v<版本>` tag，再通过 npm Trusted Publishing 发布 tarball，核对指定版本和 `latest`。随后从 CHANGELOG.md 提取该版本说明，创建 GitHub Release 并附上同一 tarball。
 
 已有 tag 必须指向当前提交；指向其他提交时，需要先合并新版本 PR。同一提交已创建 tag 而 npm 尚未发布时，可修复失败原因后重试 `publish`。npm 已确认发布的版本不可重新发布。
 
