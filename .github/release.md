@@ -30,6 +30,8 @@
 
 已有 tag 必须指向当前提交；指向其他提交时，需要先合并新版本 PR。同一提交已创建 tag 而 npm 尚未发布时，可修复失败原因后重试 `publish`。npm 已确认发布的版本不可重新发布。
 
+若 npm 已发布但核验超时，从 `main` 选择 `finish`。工作流不修改版本、tag 或 npm 内容；重新构建 tarball，以无缓存请求核对精确版本、`latest` 和 tarball integrity，通过后创建 GitHub Release。
+
 本仓库 npm Trusted Publisher 的字段为：
 
 | 字段 | 值 |
