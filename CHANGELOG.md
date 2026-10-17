@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 - 2026-10-17
 
 - Reject pending and subsequent requests when the multilingual Laya worker exits.
 - Default to Jev; document backend setup and retaining an existing Laya selection.
