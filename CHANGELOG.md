@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Shorten the environment prompt while retaining narrative and reward bookkeeping rules.
+
 ## 0.4.1 - 2026-10-17
 
 - Reject pending and subsequent requests when the multilingual Laya worker exits.
