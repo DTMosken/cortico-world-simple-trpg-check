@@ -8,7 +8,7 @@
 
 提交前搜索已有 Issue，一个 Issue 描述一个问题或一项需求。缺陷报告填写扩展和 Cortico 版本、实际与预期行为、复现步骤；涉及评分时，提供技能、角色证据、情境和评分方式。涉及随机结果时，保留骰值与完整检定回执。
 
-日志、配置和截图只保留复现必需的信息，移除密钥、令牌和私人角色资料。安全漏洞和涉及个人隐私的材料通过 [noreply@mosken.observer](mailto:noreply@mosken.observer) 私密报告。
+日志、配置和截图只保留复现必需的信息，移除密钥、令牌和私人角色资料。安全漏洞和涉及个人隐私的材料通过 [security@mosken.observer](mailto:security@mosken.observer) 私密报告。
 
 功能请求说明使用场景、具体输入与预期行为，以及现有配置或操作为何不足。Core、Persona 或其他 World 的改动在其所属仓库讨论。
 
