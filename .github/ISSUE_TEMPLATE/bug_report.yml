@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        一个 Issue 描述一个问题。日志、配置和截图请移除密钥、令牌和私人资料；安全漏洞通过 noreply@mosken.observer 私密报告。
+        一个 Issue 描述一个问题。日志、配置和截图请移除密钥、令牌和私人资料；安全漏洞通过 security@mosken.observer 私密报告。
   - type: textarea
     id: environment
     attributes:
