@@ -1,9 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Consolidate bonus, grade and joint guidance in parameter descriptions and shorten contest tool instructions.
-
 ## 0.4.2 - 2026-10-21
 
 - Shorten the environment prompt while retaining narrative and reward bookkeeping rules.
