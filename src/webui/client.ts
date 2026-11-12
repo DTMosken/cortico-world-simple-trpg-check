@@ -99,7 +99,7 @@ async function mountConfig(ctx: WebUiPanelContext): Promise<void> {
       if (key === 'jevSource') {
         const sourceName = config.jevSource === 'openrouter' ? 'OpenRouter' : config.jevSource === 'custom' ? '自定义服务' : 'TypeSafe';
         const keyStatus = ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off');
-        const input = ui.input({ type: 'password', cls: 'mono grow', onCommit: () => saveKey.click() });
+        const input = ui.input({ type: 'password', cls: 'mono', onCommit: () => saveKey.click() });
         const saveKey = ui.button('保存密钥', { size: 'sm', variant: 'primary', onClick: () => {
           if (!input.value.trim()) return;
           saveKey.disabled = true;
