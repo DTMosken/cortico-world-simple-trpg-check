@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3 - 2026-11-13
+
+- Save a Jev API key for the selected service directly in the configuration panel. Existing keys and legacy key lookup remain supported.
+
 ## 0.4.2 - 2026-10-21
 
 - Shorten the environment prompt while retaining narrative and reward bookkeeping rules.

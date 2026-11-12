@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolCallContext } from 'cortico/core/types.ts';
@@ -206,33 +206,23 @@ describe('Simple TRPG Check World', () => {
       .rejects.toThrow('未知配置项');
   });
 
-  it('opens a deployment key file with the selected Jev placeholder and rejects a stale source', async () => {
+  it('saves the selected Jev key and rejects a stale source', async () => {
     const ctx = fakeWorldContext(SIMPLE_TRPG_CHECK, { scratchDir });
+    const keys = new Map<string, string>();
+    ctx.secret = name => keys.get(name) ?? '';
+    ctx.storeSecret = (name, value) => { keys.set(name, value); };
     ctx.cfg.backend = 'jev';
-    const opened: string[] = [];
-    const scorer: SkillScorer = { async score() { return [0.5]; }, async close() {} };
-    const world = new SimpleTrpgCheckWorld(ctx, scorer, () => 20, (file) => { opened.push(file); });
-    const panel = world.webUi?.();
-    expect(panel?.panels).toEqual([{ id: 'config', title: '配置' }]);
-    expect(await panel?.invoke?.('config', 'state', [])).toMatchObject({ config: { jevSource: 'typesafe' }, keySet: false });
-    const first = await panel?.invoke?.('config', 'openKeyFile', ['typesafe']) as { file: string };
-    expect(opened).toEqual([first.file]);
-    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
-    ctx.cfg.jevSource = 'custom';
-    await panel?.invoke?.('config', 'openKeyFile', ['custom']);
-    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_CUSTOM_SECRET}=`);
-    ctx.cfg.jevSource = 'typesafe';
-    await panel?.invoke?.('config', 'openKeyFile', ['typesafe']);
-    expect(readFileSync(first.file, 'utf8').match(new RegExp(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`, 'g'))).toHaveLength(1);
-    writeFileSync(first.file, `${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
-    await panel?.invoke?.('config', 'openKeyFile', ['typesafe']);
-    expect(readFileSync(first.file, 'utf8')).toBe(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=existing-value\n`);
-    ctx.cfg.jevSource = 'openrouter';
-    await expect(panel?.invoke?.('config', 'openKeyFile', ['typesafe']))
-      .rejects.toThrow('服务已改变');
-    await panel?.invoke?.('config', 'openKeyFile', ['openrouter']);
-    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_OPENROUTER_SECRET}=`);
-    expect(readFileSync(first.file, 'utf8')).toContain(`${SIMPLE_TRPG_CHECK_TYPESAFE_SECRET}=`);
+    const panel = new SimpleTrpgCheckWorld(ctx).webUi();
+    for (const [source, name] of [['typesafe', SIMPLE_TRPG_CHECK_TYPESAFE_SECRET],
+      ['custom', SIMPLE_TRPG_CHECK_CUSTOM_SECRET], ['openrouter', SIMPLE_TRPG_CHECK_OPENROUTER_SECRET]] as const) {
+      ctx.cfg.jevSource = source;
+      const state = await panel.invoke?.('config', 'saveKey', [source, 'fixture-key']);
+      expect(state).toMatchObject({ keySet: true });
+      expect(JSON.stringify(state)).not.toContain('fixture-key');
+      expect(ctx.secret(name)).toBe('fixture-key');
+    }
+    await expect(panel.invoke?.('config', 'saveKey', ['typesafe', 'other-key'])).rejects.toThrow('服务已改变');
+    expect(ctx.secret(SIMPLE_TRPG_CHECK_TYPESAFE_SECRET)).toBe('fixture-key');
   });
 
   it('lights the model lamp after a successful score and clears it on source change', async () => {

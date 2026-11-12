@@ -98,21 +98,25 @@ async function mountConfig(ctx: WebUiPanelContext): Promise<void> {
       }
       if (key === 'jevSource') {
         const sourceName = config.jevSource === 'openrouter' ? 'OpenRouter' : config.jevSource === 'custom' ? '自定义服务' : 'TypeSafe';
-        const keyStatus = ui.msgline(state.keySet ? '密钥已配置' : '密钥未配置');
-        const open = ui.button(`打开 ${sourceName} 密钥文件`, {
-          onClick: () => {
-            open.disabled = true;
-            void ctx.invoke<{ file: string }>('openKeyFile', [config.jevSource]).then(({ file }) => {
-              keyStatus.textContent = `已打开 ${file}`;
-            }).catch((error) => {
-              keyStatus.textContent = `打开失败：${error instanceof Error ? error.message : String(error)}`;
-              keyStatus.classList.add('bad');
-            }).finally(() => { open.disabled = false; });
-          },
-        });
+        const keyStatus = ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off');
+        const input = ui.input({ type: 'password', cls: 'mono', onCommit: () => saveKey.click() });
+        const saveKey = ui.button('保存密钥', { size: 'sm', variant: 'primary', onClick: () => {
+          if (!input.value.trim()) return;
+          saveKey.disabled = true;
+          void ctx.invoke<ConfigState>('saveKey', [config.jevSource, input.value]).then(next => {
+            state = next;
+            status = '已保存';
+            failed = false;
+            render();
+            void ctx.refresh().catch(() => undefined);
+          }).catch(error => {
+            result.textContent = error instanceof Error ? error.message : '保存失败';
+            result.classList.add('bad');
+          }).finally(() => { saveKey.disabled = false; });
+        } });
         const keyRow = ui.rowbar();
-        keyRow.append(field, keyStatus, open);
-        fields.appendChild(keyRow);
+        keyRow.append(input, saveKey);
+        fields.append(field, keyStatus, ui.field(`${sourceName} API Key`, keyRow));
       } else fields.appendChild(field);
       if (key === 'jevModel' && !hasCalibratedReadout(decisionModel(config))) {
         fields.appendChild(ui.msgline('未校准：技能水平按档位代表值取期望。'));
