@@ -98,9 +98,9 @@ async function mountConfig(ctx: WebUiPanelContext): Promise<void> {
       }
       if (key === 'jevSource') {
         const sourceName = config.jevSource === 'openrouter' ? 'OpenRouter' : config.jevSource === 'custom' ? '自定义服务' : 'TypeSafe';
-        const keyStatus = ui.msgline(state.keySet ? '密钥已配置' : '密钥未配置');
-        const input = ui.input({ type: 'password' });
-        const saveKey = ui.button('保存密钥', { onClick: () => {
+        const keyStatus = ui.pill(state.keySet ? '密钥已配置' : '密钥未配置', state.keySet ? 'on' : 'off');
+        const input = ui.input({ type: 'password', cls: 'mono grow', onCommit: () => saveKey.click() });
+        const saveKey = ui.button('保存密钥', { size: 'sm', variant: 'primary', onClick: () => {
           if (!input.value.trim()) return;
           saveKey.disabled = true;
           void ctx.invoke<ConfigState>('saveKey', [config.jevSource, input.value]).then(next => {
@@ -110,13 +110,13 @@ async function mountConfig(ctx: WebUiPanelContext): Promise<void> {
             render();
             void ctx.refresh().catch(() => undefined);
           }).catch(error => {
-            keyStatus.textContent = error instanceof Error ? error.message : '保存失败';
-            keyStatus.classList.add('bad');
+            result.textContent = error instanceof Error ? error.message : '保存失败';
+            result.classList.add('bad');
           }).finally(() => { saveKey.disabled = false; });
         } });
         const keyRow = ui.rowbar();
-        keyRow.append(field, ui.field(`${sourceName} API Key`, input), keyStatus, saveKey);
-        fields.appendChild(keyRow);
+        keyRow.append(input, saveKey);
+        fields.append(field, keyStatus, ui.field(`${sourceName} API Key`, keyRow));
       } else fields.appendChild(field);
       if (key === 'jevModel' && !hasCalibratedReadout(decisionModel(config))) {
         fields.appendChild(ui.msgline('未校准：技能水平按档位代表值取期望。'));
