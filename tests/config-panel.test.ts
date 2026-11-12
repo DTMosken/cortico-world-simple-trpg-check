@@ -52,7 +52,7 @@ it('places the test first and shows only settings for the selected model', async
   poll();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(root.textContent).toContain('自定义决策服务地址');
-  expect(root.textContent).toContain('打开 自定义服务 密钥文件');
+  expect(root.textContent).toContain('自定义服务 API Key');
 });
 
 it('saves preset and custom model IDs while retaining the service key', async () => {
@@ -81,7 +81,7 @@ it('saves preset and custom model IDs while retaining the service key', async ()
     expect(root.querySelector('input[list="trpg-decision-models"]').value).toBe(model);
     expect(root.textContent).toContain('未校准');
     expect(root.textContent).toContain('密钥已配置');
-    expect(root.textContent).toContain('打开 OpenRouter 密钥文件');
+    expect(root.textContent).toContain('OpenRouter API Key');
   }
   controller.abort();
 });

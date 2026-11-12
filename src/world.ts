@@ -35,7 +35,6 @@ import { formatContest, formatReceipt, type ContestSide, type SkillCheck } from 
 import { SystemOneSkillScorer, type SkillScorer } from './model.ts';
 import { budgetViolation, checksLabel, type CheckRequest, type CheckSpec } from './request.ts';
 import { discoverCondaPythonOptions } from './conda-environments.ts';
-import { ensureSecretPlaceholder, openSecretFile } from './secret-file.ts';
 
 const ENV_PROMPT_FILE = fileURLToPath(new URL('./ENV_PROMPT.md', import.meta.url));
 
@@ -175,7 +174,6 @@ export class SimpleTrpgCheckWorld implements World {
     private readonly ctx: WorldContext<SimpleTrpgCheckConfigSection>,
     scorer?: SkillScorer,
     private readonly roll: () => number = () => randomInt(1, 101),
-    private readonly openFile: (path: string) => void | Promise<void> = openSecretFile,
   ) {
     this.scorer = scorer ?? new SystemOneSkillScorer(ctx);
   }
@@ -255,16 +253,19 @@ export class SimpleTrpgCheckWorld implements World {
             return { ok: false, error: error instanceof Error ? error.message : String(error) };
           }
         }
-        if (method === 'openKeyFile') {
+        if (method === 'saveKey') {
           const source = args[0];
           if (source !== this.ctx.cfg.jevSource || this.ctx.cfg.backend !== 'jev') {
             throw new Error('决策服务已改变，请重试');
           }
           const secretName = this.ctx.cfg.jevSource === 'openrouter' ? SIMPLE_TRPG_CHECK_OPENROUTER_SECRET
             : this.ctx.cfg.jevSource === 'custom' ? SIMPLE_TRPG_CHECK_CUSTOM_SECRET : SIMPLE_TRPG_CHECK_TYPESAFE_SECRET;
-          const file = ensureSecretPlaceholder(this.ctx.botDir, secretName);
-          await this.openFile(file);
-          return { file };
+          const value = args[1];
+          if (typeof value !== 'string') throw new Error('密钥须为文本');
+          const key = value.trim();
+          if (/\s/.test(key)) throw new Error('密钥不能包含空白字符');
+          if (key) this.ctx.storeSecret(secretName, key);
+          return { config: { ...this.ctx.cfg }, keySet: this.hasJevKey() };
         }
         throw new Error('未知操作');
       },
